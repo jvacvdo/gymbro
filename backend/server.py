@@ -43,9 +43,13 @@ origins.add("http://localhost:5173")
 if os.environ.get("APP_URL"):
     origins.add(os.environ["APP_URL"])
 
+# El frontend vive en Vercel, que asigna un dominio distinto a cada
+# despliegue (gymbro-<hash>-<equipo>.vercel.app). Enumerarlos a mano es
+# inviable, asi que se permiten por patron ademas de la lista explicita.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(origins),
+    allow_origin_regex=r"https://[a-z0-9-]+\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
