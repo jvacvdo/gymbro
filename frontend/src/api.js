@@ -2,7 +2,12 @@
 // Base URL from Vite env; JWT token persisted in localStorage.
 // NOTE: this module is intentionally NOT wired into any screen yet.
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+// Un VITE_API_URL vacio significa "mismo dominio": las llamadas salen como
+// /api/... y las enruta el ingress. Es lo que queremos cuando el frontend y
+// el backend se despliegan juntos. Solo si la variable no esta definida se
+// asume desarrollo local.
+const RAW = import.meta.env.VITE_API_URL;
+const BASE = RAW === undefined ? 'http://localhost:8001' : RAW;
 const TOKEN_KEY = 'gb_token';
 
 export function getToken() {
