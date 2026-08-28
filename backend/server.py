@@ -235,6 +235,13 @@ def _count_series(muscles: List[dict]) -> int:
     )
 
 
+def _signed(value, unit: str = "") -> str:
+    """Formatea un delta con su signo real. Evita el '+-31%' que salia de
+    anteponer '+' a un numero ya negativo."""
+    sign = "+" if value > 0 else ("-" if value < 0 else "")
+    return f"{sign}{abs(value)}{unit}"
+
+
 def _session_volume(muscles: List[dict]) -> float:
     return sum(
         s.get("kg", 0) * s.get("reps", 0)
@@ -292,14 +299,26 @@ async def next_session(user: dict = Depends(get_current_user)):
     n_series = _count_series(muscles)
     planned_vol = _session_volume(muscles)
 
-    last = await db.sessions.find_one(
-        {"user_id": user["_id"], "status": "entrenado"}, sort=[("date", -1)]
-    )
+    # Comparar contra la ultima sesion entrenada que comparta musculo. Medir
+    # un dia de espalda contra uno de pecho no dice nada, y si la ultima
+    # sesion es de otro grupo el porcentaje se dispara.
+    planned_muscles = {m.get("muscle") for m in muscles}
     est_pct = 0
-    if last:
-        last_vol = _session_volume(last.get("muscles", []))
-        if last_vol > 0:
-            est_pct = round((planned_vol - last_vol) / last_vol * 100)
+    cursor = (
+        db.sessions.find({"user_id": user["_id"], "status": "entrenado"})
+        .sort("date", -1)
+        .limit(20)
+    )
+    async for prev in cursor:
+        prev_muscles = {m.get("muscle") for m in prev.get("muscles", [])}
+        if not (planned_muscles & prev_muscles):
+            continue
+        prev_vol = _session_volume(prev.get("muscles", []))
+        if prev_vol > 0:
+            # Acotado: un porcentaje de tres cifras es siempre ruido de datos,
+            # no una senal util para el usuario.
+            est_pct = max(-99, min(99, round((planned_vol - prev_vol) / prev_vol * 100)))
+        break
 
     return {
         "date": s["date"],
@@ -413,13 +432,13 @@ async def progress_exercise(
     if rows:
         cur_max = max(maxes)
         prev_max = max(maxes[:-1]) if len(maxes) > 1 else 0
-        records.append(["1RM", f"{round(cur_max,1)} kg", f"+{round(cur_max-prev_max,1)} kg"])
+        records.append(["1RM", f"{round(cur_max,1)} kg", _signed(round(cur_max - prev_max, 1), " kg")])
 
         vols = [r["volume"] for r in rows]
         cur_vol = vols[-1]
         prev_vol = vols[-2] if len(vols) > 1 else 0
         vdelta = round((cur_vol - prev_vol) / prev_vol * 100) if prev_vol else 0
-        records.append(["Vol. máx", f"{round(max(vols)):,} kg", f"+{vdelta}%"])
+        records.append(["Vol. máx", f"{round(max(vols)):,} kg", _signed(vdelta, "%")])
 
         # reps máx at the top weight of the last session
         top_set = await db.setlogs.find_one(
@@ -427,8 +446,20 @@ async def progress_exercise(
             sort=[("date", -1), ("kg", -1), ("reps", -1)],
         )
         if top_set:
+            # Delta real contra el mejor registro anterior a ese peso. Antes
+            # era un "+1" fijo, es decir un dato inventado.
+            prev_best = await db.setlogs.find(
+                {
+                    "user_id": user["_id"],
+                    "exercise_name": exercise,
+                    "done": True,
+                    "kg": top_set["kg"],
+                    "date": {"$lt": top_set["date"]},
+                }
+            ).sort("reps", -1).limit(1).to_list(1)
+            delta = _signed(top_set["reps"] - prev_best[0]["reps"]) if prev_best else ""
             records.append(
-                ["Reps máx", f"{top_set['reps']} @ {round(top_set['kg'])}kg", "+1"]
+                ["Reps máx", f"{top_set['reps']} @ {round(top_set['kg'])}kg", delta]
             )
 
     # stagnating: max load has not risen in the last 3 sessions
@@ -496,9 +527,28 @@ def _mk_series(kg, reps, n=3, by="ti"):
 
 
 async def seed_demo():
+    """Siembra el usuario demo de forma idempotente.
+
+    Antes salia por la puerta de atras si el usuario ya existia, asi que los
+    datos que dejaban las pruebas se acumulaban encima y falseaban graficas y
+    porcentajes. Ahora se rehacen sus sesiones en cada arranque. Solo afecta a
+    datos de demo y de test, nunca a cuentas reales.
+    """
     demo_email = "demo@gymbro.app"
-    if await db.users.find_one({"email": demo_email}):
-        return
+
+    # Restos de ejecuciones de tests: usuarios TEST_* y todo lo suyo.
+    async for u in db.users.find({"email": {"$regex": "^TEST_"}}):
+        await db.sessions.delete_many({"user_id": u["_id"]})
+        await db.setlogs.delete_many({"user_id": u["_id"]})
+        await db.users.delete_one({"_id": u["_id"]})
+
+    existing = await db.users.find_one({"email": demo_email})
+    if existing:
+        # Se conserva la cuenta (y su contrasena); se rehace su historial.
+        await db.sessions.delete_many({"user_id": existing["_id"]})
+        await db.setlogs.delete_many({"user_id": existing["_id"]})
+        await db.users.delete_one({"_id": existing["_id"]})
+
     user = {
         "email": demo_email,
         "username": "demo",
