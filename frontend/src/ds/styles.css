@@ -2,7 +2,18 @@
    This file is a manifest of @imports only.
    Consumers link this one file to receive all tokens and fonts. */
 
-@import "./tokens/fonts.css";
+/* ── Fuentes ──────────────────────────────────────────────────────────
+   Activa UNA de las dos lineas. Ahora mismo se usan las sustitutas
+   libres, porque GT Super y Suisse estan en version Trial y no se pueden
+   distribuir en un despliegue publico.
+
+   Cuando compres las licencias: descomenta fonts.css y comenta
+   fonts-free.css. No hay que tocar ninguna pantalla. */
+
+/* @import "./tokens/fonts.css"; */      /* GT Super + Suisse (Trial, licencia pendiente) */
+@import "./tokens/fonts-free.css";       /* Fraunces + Inter + IBM Plex Mono (SIL OFL) */
+
+/* ── Resto de tokens ──────────────────────────────────────────────── */
 @import "./tokens/colors.css";
 @import "./tokens/typography.css";
 @import "./tokens/spacing.css";

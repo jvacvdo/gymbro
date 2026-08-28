@@ -1,0 +1,23 @@
+/* GymBro — Sustitutas libres (SIL OFL, uso comercial permitido)
+   =============================================================
+   Reemplazo temporal de las fuentes de pago mientras no haya licencia de
+   GT Super Display y Suisse Intl. Los archivos se sirven desde el propio
+   bundle: ni una peticion a un dominio externo.
+
+     GT Super Display  ->  Fraunces      (serif editorial, contraste alto)
+     Suisse Intl       ->  Inter         (grotesca neo-suiza)
+     Suisse Intl Mono  ->  IBM Plex Mono (mono de raiz suiza)
+
+   PARA VOLVER A LAS DE PAGO: en styles.css, comenta el @import de este
+   archivo. Nada mas. Las de pago siguen declaradas en tokens/fonts.css. */
+
+@import "@fontsource-variable/fraunces/wght.css";
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-700.css";
+
+:root:root {
+  --font-ui:      "Inter Variable", system-ui, -apple-system, sans-serif;
+  --font-display: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --font-mono:    "IBM Plex Mono", "SF Mono", "Fira Mono", ui-monospace, monospace;
+}

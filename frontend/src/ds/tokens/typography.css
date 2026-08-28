@@ -4,6 +4,8 @@
 
 :root {
   /* ─── Font Stacks ────────────────────────────────────────────── */
+  /* Familias de marca. tokens/fonts-free.css las redefine mientras las de
+     pago no esten licenciadas; el orden de @import en styles.css decide. */
   --font-ui:       "Suisse Intl", system-ui, -apple-system, sans-serif;
   --font-display:  "GT Super Display", Georgia, "Times New Roman", serif;
   --font-mono:     "Suisse Intl Mono", "SF Mono", "Fira Mono", ui-monospace, monospace;

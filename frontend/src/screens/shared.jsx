@@ -10,9 +10,9 @@ const SAGE='#9FD89A', STEEL='#8AA2C0', AMBER='#C4963A', NEUTRAL='#8A8A8E';
 const BORDER='var(--gb-border)', BDEF='var(--gb-def)', BSTRONG='var(--gb-strong)';
 const TEXT1='var(--gb-text1)', TEXT2='var(--gb-text2)', TEXT3='var(--gb-text3)';
 const R=8;                                    // global card/button radius
-const UI='"Suisse Intl",system-ui,sans-serif';
-const DSP='"GT Super Display",Georgia,serif';
-const MONO='"Suisse Intl Mono",monospace';
+const UI='var(--font-ui)';
+const DSP='var(--font-display)';
+const MONO='var(--font-mono)';
 const ISO_SRC='isotype-mask.png', ISO_RATIO=361/257;
 
 /* ── Muscle taxonomy ─────────────────────────────────── */
