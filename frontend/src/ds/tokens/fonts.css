@@ -1,0 +1,72 @@
+/* GymBro Design System — Web Font Declarations
+   Three families: UI sans, editorial serif, mono data.
+   All weights declared; use font-display: swap for performance. */
+
+/* ─── Suisse Intl — Primary UI typeface ─────────────────── */
+@font-face {
+  font-family: "Suisse Intl";
+  src: url("../assets/fonts/SuisseIntlTrial-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Suisse Intl";
+  src: url("../assets/fonts/SuisseIntlTrial-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Suisse Intl";
+  src: url("../assets/fonts/SuisseIntlTrial-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Suisse Intl";
+  src: url("../assets/fonts/SuisseIntlTrial-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Suisse Intl";
+  src: url("../assets/fonts/SuisseIntlTrial-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── GT Super Display — Editorial / headline typeface ───── */
+@font-face {
+  font-family: "GT Super Display";
+  src: url("../assets/fonts/GT-Super-Display-Regular-Trial.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "GT Super Display";
+  src: url("../assets/fonts/GT-Super-Display-Bold-Trial.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── Suisse Intl Mono — Data labels / micro text ────────── */
+@font-face {
+  font-family: "Suisse Intl Mono";
+  src: url("../assets/fonts/SuisseIntlMonoTrial-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Suisse Intl Mono";
+  src: url("../assets/fonts/SuisseIntlMonoTrial-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

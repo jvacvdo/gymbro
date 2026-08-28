@@ -1,0 +1,53 @@
+/* GymBro Design System — Color Tokens
+   Dark-mode-first palette built on near-black base.
+   Two accent colors: Sage Green (progress) & Steel Blue (data). */
+
+:root {
+  /* ─── Primitives ─────────────────────────────────────────────── */
+  --color-black:       #000000;
+  --color-white:       #FFFFFF;
+  --color-off-black:   #101012;   /* primary app background        */
+  --color-off-white:   #FFFBF5;   /* primary text on dark          */
+  --color-sage:        #9FD89A;   /* progress / success / completion */
+  --color-sage-deep:   #14201A;   /* dark end of sage glow gradient */
+  --color-steel:       #8AA2C0;   /* data / analytics / neutral+   */
+  --color-steel-deep:  #0C1420;   /* dark end of steel glow gradient*/
+
+  /* ─── Surfaces ───────────────────────────────────────────────── */
+  --bg-base:           var(--color-black);
+  --bg-primary:        var(--color-off-black);      /* #101012 — app shell      */
+  --bg-card:           #18181B;                     /* standard card surface    */
+  --bg-elevated:       #222226;                     /* modals, overlays         */
+  --bg-overlay:        rgba(16, 16, 18, 0.92);      /* backdrop scrim           */
+  --bg-input:          #1C1C1F;                     /* input field background   */
+  --bg-light:          var(--color-off-white);      /* reversed / light context */
+
+  /* ─── Text ───────────────────────────────────────────────────── */
+  --text-primary:      var(--color-off-white);              /* #FFFBF5 */
+  --text-secondary:    rgba(255, 251, 245, 0.55);
+  --text-muted:        rgba(255, 251, 245, 0.30);
+  --text-disabled:     rgba(255, 251, 245, 0.18);
+  --text-on-light:     var(--color-off-black);
+  --text-on-accent:    var(--color-off-black);
+
+  /* ─── Accents ────────────────────────────────────────────────── */
+  --accent-progress:       var(--color-sage);           /* #9FD89A */
+  --accent-data:           var(--color-steel);          /* #8AA2C0 */
+  --accent-progress-faint: rgba(159, 216, 154, 0.10);
+  --accent-data-faint:     rgba(138, 162, 192, 0.10);
+  --accent-progress-mid:   rgba(159, 216, 154, 0.22);
+  --accent-data-mid:       rgba(138, 162, 192, 0.22);
+
+  /* ─── Borders ────────────────────────────────────────────────── */
+  --border-faint:      rgba(255, 251, 245, 0.04);
+  --border-subtle:     rgba(255, 251, 245, 0.07);
+  --border-default:    rgba(255, 251, 245, 0.11);
+  --border-strong:     rgba(255, 251, 245, 0.22);
+  --border-accent:     var(--color-sage);
+
+  /* ─── Atmospheric Gradients ──────────────────────────────────── */
+  --gradient-sage-glow:     linear-gradient(135deg, #9FD89A 0%, #14201A 100%); /* @kind color */
+  --gradient-steel-glow:    linear-gradient(135deg, #8AA2C0 0%, #0C1420 100%); /* @kind color */
+  --gradient-dark-veil:     linear-gradient(180deg, transparent 0%, #101012 100%); /* @kind color */
+  --gradient-dark-veil-top: linear-gradient(0deg, transparent 0%, #101012 100%); /* @kind color */
+}

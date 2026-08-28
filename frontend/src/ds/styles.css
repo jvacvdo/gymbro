@@ -1,0 +1,9 @@
+/* GymBro Design System — Root Entry Point
+   This file is a manifest of @imports only.
+   Consumers link this one file to receive all tokens and fonts. */
+
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/effects.css";

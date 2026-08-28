@@ -1,0 +1,83 @@
+<!-- @dsCard group="Components" viewport="700x210" name="Card" subtitle="Dark surface container · default · elevated · sage glow · steel glow" -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../../styles.css">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #0A0A0C; padding: 18px 20px; overflow: hidden; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+    .label { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+    .content { font-family: var(--font-ui); font-size: 13px; color: var(--text-secondary); }
+    .meta { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); margin-top: 6px; }
+    .bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { Card } = window.GymBroDesignSystem_6cd11e;
+
+    function Demo() {
+      return (
+        <div>
+          <div className="grid">
+            <div>
+              <div className="label">Default</div>
+              <Card variant="default" padding="md">
+                <div className="content">Bench Press</div>
+                <div className="meta">4 × 6–8 · 100 kg</div>
+              </Card>
+            </div>
+            <div>
+              <div className="label">Elevated</div>
+              <Card variant="elevated" padding="md">
+                <div className="content">Seated Row</div>
+                <div className="meta">4 × 8–10 · 82.5 kg</div>
+              </Card>
+            </div>
+            <div>
+              <div className="label">Sage glow</div>
+              <Card variant="default" padding="md" glow="sage">
+                <div className="content" style={{color:'var(--accent-progress)'}}>↑ PR</div>
+                <div className="meta" style={{color:'var(--accent-progress)', opacity:0.7}}>100 kg · 4 reps</div>
+              </Card>
+            </div>
+            <div>
+              <div className="label">Steel glow</div>
+              <Card variant="default" padding="md" glow="steel">
+                <div className="content" style={{color:'var(--accent-data)'}}>72% STR</div>
+                <div className="meta" style={{color:'var(--accent-data)', opacity:0.7}}>Consistency</div>
+              </Card>
+            </div>
+          </div>
+          <div className="bottom">
+            <div>
+              <div className="label">Clickable (hover me)</div>
+              <Card variant="default" padding="md" clickable>
+                <div className="content">Tap to navigate →</div>
+              </Card>
+            </div>
+            <div>
+              <div className="label">Radii options</div>
+              <div style={{display:'flex', gap: 8}}>
+                <Card variant="default" padding="sm" radius="sm"><div className="meta">sm 8px</div></Card>
+                <Card variant="default" padding="sm" radius="md"><div className="meta">md 12px</div></Card>
+                <Card variant="default" padding="sm" radius="lg"><div className="meta">lg 16px</div></Card>
+                <Card variant="default" padding="sm" radius="xl"><div className="meta">xl 20px</div></Card>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

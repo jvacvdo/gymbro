@@ -1,0 +1,31 @@
+/* Capa de theming del prototipo (--gb-*). Es la que hace posible claro/oscuro;
+   se mantiene tal cual venia en ui_kits/app/index.html. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100dvh;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+::-webkit-scrollbar { display: none; }
+input::placeholder { color: var(--gb-text3); }
+button { -webkit-tap-highlight-color: transparent; }
+
+[data-theme="dark"] {
+  --gb-bg:#101012; --gb-surface:#1A1A1C; --gb-elev:#242426; --gb-input:#1C1C1F;
+  --gb-text1:#FFFBF5; --gb-text2:rgba(255,251,245,0.50); --gb-text3:rgba(255,251,245,0.35);
+  --gb-border:#2A2A2C; --gb-def:rgba(255,251,245,0.13); --gb-strong:rgba(255,251,245,0.40);
+  --gb-invert:#FFFBF5; --gb-oninvert:#101012; --gb-track:rgba(255,251,245,0.08); --gb-tabbar:rgba(0,0,0,0.92);
+}
+
+[data-theme="light"] {
+  --gb-bg:#FAFAF8; --gb-surface:#F2F0EC; --gb-elev:#F2F0EC; --gb-input:#ECEAE4;
+  --gb-text1:#101012; --gb-text2:rgba(16,16,18,0.50); --gb-text3:rgba(16,16,18,0.35);
+  --gb-border:#E5E1DA; --gb-def:rgba(16,16,18,0.13); --gb-strong:rgba(16,16,18,0.30);
+  --gb-invert:#101012; --gb-oninvert:#FFFBF5; --gb-track:rgba(16,16,18,0.08); --gb-tabbar:rgba(255,255,255,0.95);
+}

@@ -1,0 +1,70 @@
+<!-- @dsCard group="Components" viewport="700x310" name="Display Elements" subtitle="Badge · ProgressRing · StatCard" -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../../styles.css">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg-primary); padding: 16px 20px; overflow: hidden; }
+    .section { margin-bottom: 14px; }
+    .section-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; }
+    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .rings-row { display: flex; align-items: center; gap: 24px; }
+    .stats-row { display: flex; align-items: center; gap: 40px; padding: 12px 20px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+    .hr { height: 1px; background: var(--border-subtle); margin: 14px 0; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { Badge, ProgressRing, StatCard } = window.GymBroDesignSystem_6cd11e;
+
+    function Card() {
+      return (
+        <div>
+          <div className="section">
+            <div className="section-label">Badge — all variants</div>
+            <div className="row">
+              <Badge variant="neutral">Strength</Badge>
+              <Badge variant="sage" dot>On track</Badge>
+              <Badge variant="steel">↑18%</Badge>
+              <Badge variant="muted">vs last week</Badge>
+              <Badge variant="strong">PR</Badge>
+              <Badge variant="neutral" size="sm">sm</Badge>
+              <Badge variant="sage"    size="lg">lg</Badge>
+            </div>
+          </div>
+          <div className="hr"></div>
+          <div className="section">
+            <div className="section-label">ProgressRing — Sage · Steel · Neutral</div>
+            <div className="rings-row">
+              <ProgressRing size={100} progress={0.72} value="72%" label="weekly"  color="sage"  strokeWidth={5} />
+              <ProgressRing size={100} progress={0.62} value="12,540" label="kg" color="sage"  strokeWidth={5} />
+              <ProgressRing size={100} progress={0.45} value="6"   label="wrkts" color="steel" strokeWidth={5} />
+              <ProgressRing size={80}  progress={0.85} value="85%" label="str"   color="steel" strokeWidth={4} />
+              <ProgressRing size={60}  progress={0.50} value="50%" label="push"  color="none"  strokeWidth={3} />
+            </div>
+          </div>
+          <div className="hr"></div>
+          <div className="section">
+            <div className="section-label">StatCard — metric row</div>
+            <div className="stats-row">
+              <StatCard label="Calories"  value="612"    unit="kcal" />
+              <StatCard label="Duration"  value="72"     unit="min"  />
+              <StatCard label="Exercises" value="6"      unit="/6"   trend="up" trendValue="2" />
+              <StatCard label="Volume"    value="12,540" unit="kg"   trend="up" trendValue="18%" size="lg" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Card />);
+  </script>
+</body>
+</html>

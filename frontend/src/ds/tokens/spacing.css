@@ -1,0 +1,22 @@
+/* GymBro Design System — Spacing Tokens
+   8px base grid. Dense mobile interface — use 4px micro-steps sparingly. */
+
+:root {
+  --space-0:    0;
+  --space-0-5:  0.125rem;   /*  2px — hairline gap             */
+  --space-1:    0.25rem;    /*  4px — tight / icon gap         */
+  --space-1-5:  0.375rem;   /*  6px — compact list row         */
+  --space-2:    0.5rem;     /*  8px — tight padding, icon gap  */
+  --space-3:    0.75rem;    /* 12px — compact card padding     */
+  --space-4:    1rem;       /* 16px — standard inner padding   */
+  --space-5:    1.25rem;    /* 20px — section gap (tight)      */
+  --space-6:    1.5rem;     /* 24px — section gap (standard)   */
+  --space-7:    1.75rem;    /* 28px — generous gap             */
+  --space-8:    2rem;       /* 32px — between sections         */
+  --space-10:   2.5rem;     /* 40px — large section gap        */
+  --space-12:   3rem;       /* 48px — extra large              */
+  --space-14:   3.5rem;     /* 56px — hero spacing             */
+  --space-16:   4rem;       /* 64px — page section             */
+  --space-20:   5rem;       /* 80px — large breakout           */
+  --space-24:   6rem;       /* 96px — max section padding      */
+}
