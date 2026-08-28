@@ -60,7 +60,7 @@ function SelectStage({picked,setPicked,onStart,intro}){
 // context: { mode:'athlete'|'gymbro'|'trainer', name, tint:'sage'|'steel' }
 function WorkoutFlow({context={mode:'athlete'},onExit}){
   const { BG,CARD,ELEV,OW,SAGE,STEEL,BORDER,BDEF,BSTRONG,TEXT1,TEXT2,TEXT3,UI,DSP,MONO,R,
-          Icon,StatusBar,PrimaryBtn,OutlineBtn,Stepper } = E;
+          Icon,StatusBar,PrimaryBtn,OutlineBtn,Stepper,BottomSheet } = E;
   const tint = context.tint || (context.mode==='trainer'?'steel':'sage');
   const tintC = tint==='steel'?STEEL:SAGE;
   const tintGlow = tint==='steel'?'rgba(138,162,192,0.18)':'rgba(159,216,154,0.18)';
@@ -89,6 +89,12 @@ function WorkoutFlow({context={mode:'athlete'},onExit}){
   const muscle=session[mi], exercise=muscle&&muscle.exercises[ei];
   const muscleDone = muscle && muscle.exercises.every(e=>e.done);
   const allDone = session.length>0 && session.every(m=>m.status==='done');
+  /* Basta una serie marcada para que la sesion valga la pena guardarse.
+     Exigir el ritual completo (cada ejercicio, cada musculo) hacia que
+     saltarse un ejercicio costase la sesion entera. */
+  const hasLoggedSets = session.some(m=>m.exercises.some(e=>e.series.some(x=>x.done)));
+  const [confirmExit,setConfirmExit]=useStateE(false);
+  const tryExit = () => hasLoggedSets ? setConfirmExit(true) : onExit();
 
   const finishExercise=()=>{
     const ex=muscle.exercises;
@@ -134,7 +140,7 @@ function WorkoutFlow({context={mode:'athlete'},onExit}){
       <div style={{flex:1,overflowY:'auto',padding:'0 20px 120px'}}>
         {context.mode!=='athlete'&&<ContextBar context={context} tintC={tintC}/>}
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
-          <button onClick={onExit} style={{background:'none',border:'none',cursor:'pointer',padding:0,outline:'none',display:'flex'}}><Icon name="back" size={20} color={TEXT2}/></button>
+          <button onClick={tryExit} style={{background:'none',border:'none',cursor:'pointer',padding:0,outline:'none',display:'flex'}}><Icon name="back" size={20} color={TEXT2}/></button>
           <div>
             <div style={{fontFamily:DSP,fontWeight:700,fontSize:24,color:TEXT1,letterSpacing:'-0.01em'}}>Sesión de hoy</div>
             <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',marginTop:3}}>13 Julio · {session.length} músculos</div>
@@ -155,12 +161,31 @@ function WorkoutFlow({context={mode:'athlete'},onExit}){
           );
         })}
       </div>
-      {allDone&&(
+      {hasLoggedSets&&(
         <div style={{position:'absolute',left:20,right:20,bottom:26}}>
-          <div style={{position:'absolute',inset:'-8px -8px',background:`radial-gradient(ellipse, ${tintGlow} 0%, transparent 70%)`,pointerEvents:'none'}}></div>
-          <div style={{position:'relative'}}><PrimaryBtn onClick={finishSession} disabled={saving} color={OW} icon="check">{saving?'Guardando…':'Finalizar sesión'}</PrimaryBtn></div>
+          {/* El resplandor se reserva para la sesion completa: celebrar un
+              cierre parcial seria enganoso. */}
+          {allDone&&<div style={{position:'absolute',inset:'-8px -8px',background:`radial-gradient(ellipse, ${tintGlow} 0%, transparent 70%)`,pointerEvents:'none'}}></div>}
+          <div style={{position:'relative'}}>
+            {!allDone&&(
+              <div style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',textAlign:'center',marginBottom:9}}>
+                {session.filter(m=>m.status!=='done').length} sin terminar · se guardan igual
+              </div>
+            )}
+            <PrimaryBtn onClick={finishSession} disabled={saving} color={OW} icon="check">{saving?'Guardando…':'Finalizar sesión'}</PrimaryBtn>
+          </div>
         </div>
       )}
+
+      <BottomSheet open={confirmExit} onClose={()=>setConfirmExit(false)} title="¿Salir sin guardar?">
+        <div style={{fontFamily:UI,fontSize:13.5,color:TEXT2,lineHeight:1.5,marginBottom:18}}>
+          Tienes series registradas en esta sesión. Si sales ahora se pierden.
+        </div>
+        <div style={{marginBottom:10}}>
+          <PrimaryBtn onClick={()=>{setConfirmExit(false);finishSession();}} color={OW} icon="check">Guardar y salir</PrimaryBtn>
+        </div>
+        <OutlineBtn onClick={()=>{setConfirmExit(false);onExit();}}>Salir sin guardar</OutlineBtn>
+      </BottomSheet>
     </div>
   );
 
