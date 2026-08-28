@@ -1,8 +1,16 @@
-/* GymBro Design System — Web Font Declarations
-   Three families: UI sans, editorial serif, mono data.
-   All weights declared; use font-display: swap for performance. */
+/* GymBro Design System — Fuentes de marca (PENDIENTES DE LICENCIA)
+   ================================================================
+   Los archivos .otf NO estan en el repo: eran versiones Trial y no se
+   pueden redistribuir. Este archivo se conserva como plantilla.
 
-/* ─── Suisse Intl — Primary UI typeface ─────────────────── */
+   Cuando compres las licencias de GT Super Display y Suisse Intl:
+     1. Copia los .otf definitivos a ../assets/fonts/
+     2. Ajusta los nombres de archivo de abajo si difieren
+     3. Descomenta el @import de este archivo en styles.css y comenta
+        el de fonts-free.css
+
+   Mientras tanto se usan las sustitutas libres de tokens/fonts-free.css. */
+
 @font-face {
   font-family: "Suisse Intl";
   src: url("../assets/fonts/SuisseIntlTrial-Light.otf") format("opentype");
