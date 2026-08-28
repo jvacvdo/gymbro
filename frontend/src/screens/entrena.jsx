@@ -58,7 +58,7 @@ function SelectStage({picked,setPicked,onStart,intro}){
 
 /* ═══ WorkoutFlow — Stages 2–4 (+ optional Stage 1) ═════ */
 // context: { mode:'athlete'|'gymbro'|'trainer', name, tint:'sage'|'steel' }
-function WorkoutFlow({context={mode:'athlete'},onExit}){
+function WorkoutFlow({context={mode:'athlete'},date,onExit}){
   const { BG,CARD,ELEV,OW,SAGE,STEEL,BORDER,BDEF,BSTRONG,TEXT1,TEXT2,TEXT3,UI,DSP,MONO,R,
           Icon,StatusBar,PrimaryBtn,OutlineBtn,Stepper,BottomSheet } = E;
   const tint = context.tint || (context.mode==='trainer'?'steel':'sage');
@@ -112,10 +112,18 @@ function WorkoutFlow({context={mode:'athlete'},onExit}){
   const finishSession=async()=>{
     if(saving) return;
     setSaving(true); setSaveErr('');
-    try{ await E.api.createSession(session,{status:'entrenado'}); }
+    try{ await E.api.createSession(session,{status:'entrenado',date:date||E.todayISO()}); }
     catch(e){ setSaveErr('No se pudo guardar la sesión: '+(e.message||'error')); }
     finally{ setSaving(false); setStage('summary'); }
   };
+
+  /* Resumen real de lo registrado. Antes eran tres numeros fijos
+     (52 min / 14 series / 4.120 kg) identicos para cualquier sesion. */
+  const hechas = session.flatMap(m=>m.exercises.flatMap(e=>e.series.filter(x=>x.done)));
+  const nSeries = hechas.length;
+  const volumen = hechas.reduce((n,x)=>n+x.kg*x.reps,0);
+  const minutos = Math.max(nSeries*4,1);
+  const fmtKg = v => v>=1000 ? v.toLocaleString('es-ES') : String(v);
 
   /* Stage 1 */
   if(stage==='select') return(
@@ -143,7 +151,7 @@ function WorkoutFlow({context={mode:'athlete'},onExit}){
           <button onClick={tryExit} style={{background:'none',border:'none',cursor:'pointer',padding:0,outline:'none',display:'flex'}}><Icon name="back" size={20} color={TEXT2}/></button>
           <div>
             <div style={{fontFamily:DSP,fontWeight:700,fontSize:24,color:TEXT1,letterSpacing:'-0.01em'}}>Sesión de hoy</div>
-            <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',marginTop:3}}>13 Julio · {session.length} músculos</div>
+            <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',marginTop:3}}>{E.dayLabel(parseInt((date||E.todayISO()).slice(8,10),10))} · {session.length} músculos</div>
           </div>
         </div>
         {session.map((m,i)=>{
@@ -243,12 +251,15 @@ function WorkoutFlow({context={mode:'athlete'},onExit}){
       <div style={{position:'absolute',top:120,left:'50%',transform:'translateX(-50%)',width:340,height:340,borderRadius:'50%',background:`radial-gradient(circle, ${isTrainer?'rgba(138,162,192,0.20)':'rgba(159,216,154,0.20)'} 0%, transparent 68%)`,pointerEvents:'none'}}></div>
       <div style={{flex:1,display:'flex',flexDirection:'column',padding:'0 24px',position:'relative'}}>
         <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',textAlign:'center'}}>
-          <div style={{width:72,height:72,borderRadius:'50%',border:`2px solid ${tintC}`,background:isTrainer?'rgba(138,162,192,0.12)':'rgba(159,216,154,0.12)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:22,boxShadow:`0 0 22px ${isTrainer?'rgba(138,162,192,0.4)':'rgba(159,216,154,0.4)'}`}}><Icon name="check" size={32} color={tintC} sw={2.4}/></div>
-          <div style={{fontFamily:DSP,fontWeight:700,fontSize:30,color:TEXT1,letterSpacing:'-0.02em',marginBottom:isTrainer?10:22}}>{isTrainer?'Rutina guardada':'Sesión completada'}</div>
+          <div style={{width:72,height:72,borderRadius:'50%',border:`2px solid ${saveErr?'#E0A0A0':tintC}`,background:saveErr?'rgba(224,160,160,0.12)':(isTrainer?'rgba(138,162,192,0.12)':'rgba(159,216,154,0.12)'),display:'flex',alignItems:'center',justifyContent:'center',marginBottom:22,boxShadow:saveErr?'none':`0 0 22px ${isTrainer?'rgba(138,162,192,0.4)':'rgba(159,216,154,0.4)'}`}}><Icon name={saveErr?'minus':'check'} size={32} color={saveErr?'#E0A0A0':tintC} sw={2.4}/></div>
+          <div style={{fontFamily:DSP,fontWeight:700,fontSize:30,color:TEXT1,letterSpacing:'-0.02em',marginBottom:isTrainer?10:22}}>{saveErr?'Sesión no guardada':(isTrainer?'Rutina guardada':'Sesión completada')}</div>
+          {saveErr&&(
+            <div style={{fontFamily:UI,fontSize:13,color:'#E0A0A0',lineHeight:1.5,maxWidth:280,marginBottom:18}}>{saveErr}</div>
+          )}
           {isTrainer
             ? <div style={{fontFamily:UI,fontSize:14,color:TEXT2,lineHeight:1.5,maxWidth:260,marginBottom:8}}>Para {context.name}. El atleta verá esta rutina en su calendario.</div>
             : <div style={{display:'flex',gap:28,marginBottom:8}}>
-                {[['52','min'],['14','series'],['4,120','kg']].map(([v,u])=>(
+                {[[String(minutos),'min'],[String(nSeries),'series'],[fmtKg(volumen),'kg']].map(([v,u])=>(
                   <div key={u} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
                     <span style={{fontFamily:DSP,fontWeight:700,fontSize:26,color:TEXT1}}>{v}</span>
                     <span style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>{u}</span>
@@ -288,12 +299,13 @@ function EntrenaScreen({onFinish}){
   const { BG,CARD,OW,SAGE,BORDER,BDEF,TEXT1,TEXT2,UI,DSP,MONO,R,
           Icon,StatusBar,Calendar } = E;
   const [flow,setFlow]=useStateE(false);
-  const [selDay,setSelDay]=useStateE(13);
+  const [selDay,setSelDay]=useStateE(new Date().getDate());
   const [cal,setCal]=useStateE({trained:[],planned:[]});
+  const MES=E.monthKey();
 
   useEffectE(()=>{
     let alive=true;
-    E.api.getSessions('2026-07').then(rows=>{
+    E.api.getSessions(MES).then(rows=>{
       if(!alive) return;
       const day=d=>parseInt(String(d).slice(8,10),10);
       setCal({
@@ -302,8 +314,11 @@ function EntrenaScreen({onFinish}){
       });
     }).catch(()=>{});
     return ()=>{alive=false;};
-  },[flow]);
-  if(flow) return <WorkoutFlow context={{mode:'athlete'}} onExit={()=>{setFlow(false);onFinish&&onFinish();}}/>;
+  },[flow,MES]);
+  /* El dia elegido en el calendario es el dia con el que se guarda la sesion.
+     Antes se seleccionaba un dia y la sesion caia siempre en hoy. */
+  const fecha=`${MES}-${String(selDay).padStart(2,'0')}`;
+  if(flow) return <WorkoutFlow context={{mode:'athlete'}} date={fecha} onExit={()=>{setFlow(false);onFinish&&onFinish();}}/>;
   return(
     <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
       <StatusBar/>
@@ -311,8 +326,8 @@ function EntrenaScreen({onFinish}){
         <div style={{fontFamily:DSP,fontWeight:400,fontSize:28,color:TEXT1,letterSpacing:'-0.01em',marginBottom:6}}>Entrena</div>
         <div style={{fontFamily:UI,fontSize:14,color:TEXT2,marginBottom:22}}>Elige un día para planificar tu sesión.</div>
         <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:R,padding:16,marginBottom:16}}>
-          <div style={{fontFamily:DSP,fontWeight:400,fontSize:18,color:TEXT1,marginBottom:14}}>Julio 2026</div>
-          <Calendar trained={cal.trained} planned={cal.planned} today={13} selected={selDay} onDay={setSelDay}/>
+          <div style={{fontFamily:DSP,fontWeight:400,fontSize:18,color:TEXT1,marginBottom:14}}>{E.monthLabel()}</div>
+          <Calendar trained={cal.trained} planned={cal.planned} selected={selDay} onDay={setSelDay}/>
         </div>
         <button onClick={()=>setFlow(true)} style={{width:'100%',height:52,background:OW,border:'none',borderRadius:R,fontFamily:UI,fontWeight:500,fontSize:15,color:BG,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,outline:'none'}}>
           <Icon name="dumbbell" size={16} color={BG}/>Comenzar a entrenar

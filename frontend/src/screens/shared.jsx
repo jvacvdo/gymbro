@@ -159,8 +159,20 @@ function ProgressRing({size=120,progress=0.7,value,label,sub,color='sage',sw=5})
 }
 
 /* ── Calendar (month grid) ───────────────────────────── */
-function Calendar({trained=[],planned=[],today=13,selected=null,onDay}){
-  const days=[]; for(let i=0;i<2;i++) days.push(null); for(let d=1;d<=31;d++) days.push(d);
+function Calendar({trained=[],planned=[],selected=null,onDay,year,month}){
+  /* El mes que se pinta. Sin props, el mes en curso del dispositivo. */
+  const now=new Date();
+  const y = year==null?now.getFullYear():year;
+  const m = month==null?now.getMonth()+1:month;   // 1-12
+
+  /* Hueco inicial: la rejilla empieza en lunes, getDay() empieza en domingo. */
+  const firstDow=(new Date(y,m-1,1).getDay()+6)%7;
+  const nDays=new Date(y,m,0).getDate();          // dia 0 del mes siguiente = ultimo de este
+  const days=[]; for(let i=0;i<firstDow;i++) days.push(null);
+  for(let d=1;d<=nDays;d++) days.push(d);
+
+  /* Solo se marca "hoy" si el mes pintado es el mes actual. */
+  const today = (y===now.getFullYear()&&m===now.getMonth()+1) ? now.getDate() : null;
   const dow=['L','M','X','J','V','S','D'];
   return(
     <div>
@@ -350,8 +362,34 @@ function QRPlaceholder({size=120}){
   );
 }
 
+/* ── Fechas ──────────────────────────────────────────────
+   Una sola fuente de verdad para el calendario. Antes cada pantalla
+   llevaba julio de 2026 escrito a mano y el dia 13 fijo. */
+const MONTHS=['enero','febrero','marzo','abril','mayo','junio',
+              'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+/* Etiqueta "Agosto 2026" del mes indicado (por defecto, el actual). */
+function monthLabel(y,m){ const d=new Date(); const Y=y==null?d.getFullYear():y, M=m==null?d.getMonth()+1:m;
+  return `${cap(MONTHS[M-1])} ${Y}`; }
+/* Clave "YYYY-MM" que espera GET /sessions?month= */
+function monthKey(y,m){ const d=new Date(); const Y=y==null?d.getFullYear():y, M=m==null?d.getMonth()+1:m;
+  return `${Y}-${String(M).padStart(2,'0')}`; }
+/* "2026-08-28" en hora local: toISOString() usa UTC y a partir de las
+   ~19h en America desplaza la fecha un dia. */
+function todayISO(){ const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+/* "28 de agosto" para titulos de dia. */
+function dayLabel(day,y,m){ const d=new Date(); const M=m==null?d.getMonth()+1:m;
+  return `${day} de ${MONTHS[M-1]}`; }
+/* Abreviaturas de los ultimos n meses, para los ejes de las graficas. */
+function lastMonthsShort(n=4){ const d=new Date(), out=[];
+  for(let i=n-1;i>=0;i--){ const x=new Date(d.getFullYear(),d.getMonth()-i,1);
+    out.push(cap(MONTHS[x.getMonth()].slice(0,3))); }
+  return out; }
+
 window.GB = {
   BG,CARD,ELEV,INPUT,OW,SAGE,STEEL,AMBER,NEUTRAL,BORDER,BDEF,BSTRONG,TEXT1,TEXT2,TEXT3,UI,DSP,MONO,R,
+  MONTHS, monthLabel, monthKey, todayISO, dayLabel, lastMonthsShort,
   TAXONOMY, Icon, Isotype, Logo, ThemeToggle, StatusBar, TabBar, ProgressRing, Calendar, PeriodToggle,
   Pill, PillRow, Field, PrimaryBtn, OutlineBtn, GhostLink, BottomSheet, LineChart, StatusDot, Stepper, QRPlaceholder, DaySelector,
 };

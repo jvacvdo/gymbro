@@ -2,8 +2,6 @@
 const H = window.GB;
 const { useState:useStateH, useEffect:useEffectH } = React;
 
-const MES = '2026-07';
-
 /* Une nombres de musculo en titulo legible: "Pecho y Triceps" */
 function joinMuscles(names){
   if(!names.length) return 'Sesion';
@@ -28,6 +26,10 @@ function HomeScreen({onEntrena,light,onToggle}){
   const [next,setNext]=useStateH(null);
   const [chart,setChart]=useStateH([]);
 
+  /* Mes que se muestra. Se recalcula en cada render, asi que si la app
+     queda abierta y cambia el dia, el calendario sigue al reloj. */
+  const MES=H.monthKey();
+
   /* Calendario del mes + proxima sesion */
   useEffectH(()=>{
     let alive=true;
@@ -39,7 +41,7 @@ function HomeScreen({onEntrena,light,onToggle}){
     }).catch(()=>{});
     H.api.getNextSession().then(n=>{ if(alive) setNext(n); }).catch(()=>{});
     return ()=>{alive=false;};
-  },[]);
+  },[MES]);
 
   /* Historial muscular: serie de carga maxima del musculo activo */
   useEffectH(()=>{
@@ -70,11 +72,11 @@ function HomeScreen({onEntrena,light,onToggle}){
 
         {/* Calendar module */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-          <span style={{fontFamily:DSP,fontWeight:400,fontSize:22,color:TEXT1,letterSpacing:'-0.01em'}}>Julio 2026</span>
+          <span style={{fontFamily:DSP,fontWeight:400,fontSize:22,color:TEXT1,letterSpacing:'-0.01em'}}>{H.monthLabel()}</span>
         </div>
         <div style={{marginBottom:14}}><PeriodToggle value={period} onChange={setPeriod}/></div>
         <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:R8(),padding:16,marginBottom:22}}>
-          <Calendar trained={trained} planned={planned} today={13} selected={selDay} onDay={setSelDay}/>
+          <Calendar trained={trained} planned={planned} selected={selDay} onDay={setSelDay}/>
           <div style={{display:'flex',gap:16,marginTop:14,paddingTop:12,borderTop:`1px solid ${BORDER}`}}>
             <span style={{display:'flex',alignItems:'center',gap:6,fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.08em',textTransform:'uppercase'}}><span style={{width:5,height:5,borderRadius:'50%',background:SAGE,boxShadow:`0 0 5px ${SAGE}`}}></span>Entrenado</span>
             <span style={{display:'flex',alignItems:'center',gap:6,fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.08em',textTransform:'uppercase'}}><span style={{width:9,height:9,borderRadius:3,border:`1px solid ${H.BSTRONG}`}}></span>Planificado</span>
@@ -120,13 +122,13 @@ function HomeScreen({onEntrena,light,onToggle}){
             ? <LineChart data={chart} prIndex={[chart.length-1]} color={STEEL}/>
             : <div style={{height:96,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:UI,fontSize:12.5,color:TEXT3}}>Sin datos para {muscle} todavía</div>}
           <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
-            {['Mar','Abr','May','Jun'].map(m=><span key={m} style={{fontFamily:MONO,fontSize:8,color:TEXT3,letterSpacing:'0.06em'}}>{m}</span>)}
+            {H.lastMonthsShort(4).map(m=><span key={m} style={{fontFamily:MONO,fontSize:8,color:TEXT3,letterSpacing:'0.06em'}}>{m}</span>)}
           </div>
         </div>
       </div>
 
       {/* Day sheet */}
-      <BottomSheet open={!!selDay} onClose={()=>setSelDay(null)} title={selDay?`${selDay} de Julio`:''}>
+      <BottomSheet open={!!selDay} onClose={()=>setSelDay(null)} title={selDay?H.dayLabel(selDay):''}>
         {plan? (
           <>
             {plan.groups.map((g,i)=>(
