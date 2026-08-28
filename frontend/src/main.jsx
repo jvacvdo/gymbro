@@ -8,6 +8,7 @@ import './theme.css';
 
 import './screens/isotype-path.js';
 import './screens/shared.jsx';
+import './attach-api.js';
 import './screens/auth.jsx';
 import './screens/home.jsx';
 import './screens/entrena.jsx';

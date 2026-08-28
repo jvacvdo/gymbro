@@ -1,14 +1,19 @@
 // GymBro — Inicio (Home): calendar, próxima sesión, historial muscular
 const H = window.GB;
-const { useState:useStateH } = React;
+const { useState:useStateH, useEffect:useEffectH } = React;
 
-const DAY_PLAN = {
-  13: { groups:[{muscle:'Pecho',exercises:['Press banca','Press inclinado','Aperturas']},{muscle:'Tríceps',exercises:['Press francés','Extensión en polea']}] },
-  15: { groups:[{muscle:'Espalda',exercises:['Jalón al pecho','Remo con barra','Dominadas']},{muscle:'Bíceps',exercises:['Curl con barra','Curl martillo']}] },
-  17: { groups:[{muscle:'Cuádriceps',exercises:['Sentadilla','Prensa de pierna','Zancadas']},{muscle:'Glúteos',exercises:['Hip thrust']}] },
-  20: { groups:[{muscle:'Hombros',exercises:['Press militar','Elevaciones laterales','Pájaros']}] },
-  22: { groups:[{muscle:'Core',exercises:['Crunch','Plancha','Elevación de piernas']}] },
-};
+const MES = '2026-07';
+
+/* Une nombres de musculo en titulo legible: "Pecho y Triceps" */
+function joinMuscles(names){
+  if(!names.length) return 'Sesion';
+  if(names.length===1) return names[0];
+  return names.slice(0,-1).join(', ')+' y '+names[names.length-1];
+}
+/* Convierte los `muscles` del backend a la forma `groups` que pinta la hoja */
+function toGroups(muscles){
+  return (muscles||[]).map(m=>({muscle:m.muscle,exercises:(m.exercises||[]).map(e=>e.name)}));
+}
 
 function HomeScreen({onEntrena,light,onToggle}){
   const { BG,CARD,ELEV,OW,SAGE,STEEL,BORDER,BDEF,TEXT1,TEXT2,TEXT3,UI,DSP,MONO,
@@ -18,15 +23,40 @@ function HomeScreen({onEntrena,light,onToggle}){
   const [group,setGroup]=useStateH('Tren Superior');
   const [muscle,setMuscle]=useStateH('Pecho');
 
-  const trained=[1,3,6,8,10,13], planned=[15,17,20,22];
-  const plan=selDay?DAY_PLAN[selDay]:null;
+  const [trained,setTrained]=useStateH([]);
+  const [planned,setPlanned]=useStateH([]);
+  const [next,setNext]=useStateH(null);
+  const [chart,setChart]=useStateH([]);
+
+  /* Calendario del mes + proxima sesion */
+  useEffectH(()=>{
+    let alive=true;
+    H.api.getSessions(MES).then(rows=>{
+      if(!alive) return;
+      const day=d=>parseInt(String(d).slice(8,10),10);
+      setTrained(rows.filter(r=>r.status==='entrenado').map(r=>day(r.date)));
+      setPlanned(rows.filter(r=>r.status==='planificado').map(r=>day(r.date)));
+    }).catch(()=>{});
+    H.api.getNextSession().then(n=>{ if(alive) setNext(n); }).catch(()=>{});
+    return ()=>{alive=false;};
+  },[]);
+
+  /* Historial muscular: serie de carga maxima del musculo activo */
+  useEffectH(()=>{
+    let alive=true;
+    H.api.getMuscleProgress(muscle)
+      .then(r=>{ if(alive) setChart((r&&r.points&&r.points.length)?r.points:[]); })
+      .catch(()=>{ if(alive) setChart([]); });
+    return ()=>{alive=false;};
+  },[muscle]);
+
+  /* La lista del mes solo trae fecha y estado. El detalle por dia solo lo
+     conocemos de la proxima sesion; el resto de dias abren en estado vacio. */
+  const nextDay = next ? parseInt(String(next.date).slice(8,10),10) : null;
+  const plan = (selDay && selDay===nextDay) ? {groups:toGroups(next.muscles)} : null;
 
   const groups=Object.keys(H.TAXONOMY);
   const muscles=Object.keys(H.TAXONOMY[group]);
-  const chart={
-    'Pecho':[62,68,70,74,80,82,90],'Espalda':[70,72,78,80,84,88,92],'Bíceps':[24,26,28,30,32,34,36],
-    'Cuádriceps':[100,110,118,120,130,140,150],'Glúteos':[80,90,100,110,120,130,140],
-  }[muscle]||[40,44,48,52,56,60,66];
 
   return(
     <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
@@ -56,13 +86,15 @@ function HomeScreen({onEntrena,light,onToggle}){
         <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:R8(),padding:18,marginBottom:24}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
             <div>
-              <div style={{fontFamily:DSP,fontWeight:700,fontSize:26,color:TEXT1,letterSpacing:'-0.01em',lineHeight:1}}>Pecho y Tríceps</div>
-              <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',marginTop:7}}>Hoy · 5 ejercicios · ~65 min</div>
+              <div style={{fontFamily:DSP,fontWeight:700,fontSize:26,color:TEXT1,letterSpacing:'-0.01em',lineHeight:1}}>{next?joinMuscles((next.muscles||[]).map(m=>m.muscle)):'Sin sesión'}</div>
+              <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',marginTop:7}}>{next?`Día ${nextDay} · ${next.exercise_count} ejercicios · ~${next.est_minutes} min`:'Nada planificado todavía'}</div>
             </div>
-            <div style={{textAlign:'right'}}>
-              <div style={{fontFamily:MONO,fontSize:9,color:SAGE,letterSpacing:'0.06em'}}>↑12%</div>
-              <div style={{fontFamily:MONO,fontSize:8,color:TEXT3,letterSpacing:'0.06em'}}>vol. est.</div>
-            </div>
+            {next&&next.est_volume_pct!==0&&(
+              <div style={{textAlign:'right'}}>
+                <div style={{fontFamily:MONO,fontSize:9,color:next.est_volume_pct>0?SAGE:TEXT3,letterSpacing:'0.06em'}}>{next.est_volume_pct>0?'↑':'↓'}{Math.abs(next.est_volume_pct)}%</div>
+                <div style={{fontFamily:MONO,fontSize:8,color:TEXT3,letterSpacing:'0.06em'}}>vol. est.</div>
+              </div>
+            )}
           </div>
           <PrimaryBtn onClick={onEntrena} color={OW} icon="chevron-right">Entrena</PrimaryBtn>
         </div>
@@ -84,7 +116,9 @@ function HomeScreen({onEntrena,light,onToggle}){
             <span style={{fontFamily:UI,fontWeight:500,fontSize:14,color:TEXT1}}>{muscle}</span>
             <span style={{fontFamily:MONO,fontSize:9,color:STEEL,letterSpacing:'0.08em',textTransform:'uppercase'}}>Carga máx · kg</span>
           </div>
-          <LineChart data={chart} prIndex={[chart.length-1]} color={STEEL}/>
+          {chart.length
+            ? <LineChart data={chart} prIndex={[chart.length-1]} color={STEEL}/>
+            : <div style={{height:96,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:UI,fontSize:12.5,color:TEXT3}}>Sin datos para {muscle} todavía</div>}
           <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
             {['Mar','Abr','May','Jun'].map(m=><span key={m} style={{fontFamily:MONO,fontSize:8,color:TEXT3,letterSpacing:'0.06em'}}>{m}</span>)}
           </div>

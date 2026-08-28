@@ -99,6 +99,18 @@ function WorkoutFlow({context={mode:'athlete'},onExit}){
   };
   const finishMuscle=()=>{ setSession(s=>s.map((m,i)=>i===mi?{...m,status:'done'}:m)); setStage('panel'); };
 
+  const [saveErr,setSaveErr]=useStateE('');
+  const [saving,setSaving]=useStateE(false);
+  /* Persiste la sesion completa antes de mostrar el resumen. Si el guardado
+     falla no bloqueamos al usuario: pasa al resumen con el aviso. */
+  const finishSession=async()=>{
+    if(saving) return;
+    setSaving(true); setSaveErr('');
+    try{ await E.api.createSession(session,{status:'entrenado'}); }
+    catch(e){ setSaveErr('No se pudo guardar la sesión: '+(e.message||'error')); }
+    finally{ setSaving(false); setStage('summary'); }
+  };
+
   /* Stage 1 */
   if(stage==='select') return(
     <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
@@ -146,7 +158,7 @@ function WorkoutFlow({context={mode:'athlete'},onExit}){
       {allDone&&(
         <div style={{position:'absolute',left:20,right:20,bottom:26}}>
           <div style={{position:'absolute',inset:'-8px -8px',background:`radial-gradient(ellipse, ${tintGlow} 0%, transparent 70%)`,pointerEvents:'none'}}></div>
-          <div style={{position:'relative'}}><PrimaryBtn onClick={()=>setStage('summary')} color={OW} icon="check">Finalizar sesión</PrimaryBtn></div>
+          <div style={{position:'relative'}}><PrimaryBtn onClick={finishSession} disabled={saving} color={OW} icon="check">{saving?'Guardando…':'Finalizar sesión'}</PrimaryBtn></div>
         </div>
       )}
     </div>
@@ -252,6 +264,20 @@ function EntrenaScreen({onFinish}){
           Icon,StatusBar,Calendar } = E;
   const [flow,setFlow]=useStateE(false);
   const [selDay,setSelDay]=useStateE(13);
+  const [cal,setCal]=useStateE({trained:[],planned:[]});
+
+  useEffectE(()=>{
+    let alive=true;
+    E.api.getSessions('2026-07').then(rows=>{
+      if(!alive) return;
+      const day=d=>parseInt(String(d).slice(8,10),10);
+      setCal({
+        trained:rows.filter(r=>r.status==='entrenado').map(r=>day(r.date)),
+        planned:rows.filter(r=>r.status==='planificado').map(r=>day(r.date)),
+      });
+    }).catch(()=>{});
+    return ()=>{alive=false;};
+  },[flow]);
   if(flow) return <WorkoutFlow context={{mode:'athlete'}} onExit={()=>{setFlow(false);onFinish&&onFinish();}}/>;
   return(
     <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
@@ -261,7 +287,7 @@ function EntrenaScreen({onFinish}){
         <div style={{fontFamily:UI,fontSize:14,color:TEXT2,marginBottom:22}}>Elige un día para planificar tu sesión.</div>
         <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:R,padding:16,marginBottom:16}}>
           <div style={{fontFamily:DSP,fontWeight:400,fontSize:18,color:TEXT1,marginBottom:14}}>Julio 2026</div>
-          <Calendar trained={[1,3,6,8,10,13]} planned={[15,17,20,22]} today={13} selected={selDay} onDay={setSelDay}/>
+          <Calendar trained={cal.trained} planned={cal.planned} today={13} selected={selDay} onDay={setSelDay}/>
         </div>
         <button onClick={()=>setFlow(true)} style={{width:'100%',height:52,background:OW,border:'none',borderRadius:R,fontFamily:UI,fontWeight:500,fontSize:15,color:BG,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,outline:'none'}}>
           <Icon name="dumbbell" size={16} color={BG}/>Comenzar a entrenar

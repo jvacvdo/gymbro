@@ -1,6 +1,6 @@
 // GymBro — Perfil: athlete view + Apariencia toggle, Trainer button, Plan screen, Trainer view
 const PF = window.GB;
-const { useState:useStatePF } = React;
+const { useState:useStatePF, useEffect:useEffectPF } = React;
 
 const CLIENTS=[
   {n:'María López',last:'Ayer',s:'progressing'},
@@ -14,6 +14,20 @@ function PerfilScreen({light,onToggle}){
           Icon,StatusBar,ThemeToggle,PrimaryBtn } = PF;
   const [view,setView]=useStatePF('profile');   // profile | plan | trainer
   const [hasTrainer,setHasTrainer]=useStatePF(true);   // Trainer plan purchased?
+  const [me,setMe]=useStatePF(null);
+
+  useEffectPF(()=>{
+    let alive=true;
+    PF.api.getMe().then(u=>{ if(alive) setMe(u); }).catch(()=>{});
+    return ()=>{alive=false;};
+  },[]);
+
+  const nombre = me && me.name ? me.name : 'Tu perfil';
+  const iniciales = nombre.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '—';
+  const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const alta = me && me.created_at
+    ? (d=>`Miembro desde ${MESES[d.getMonth()]} ${d.getFullYear()}`)(new Date(me.created_at))
+    : '';
 
   if(view==='plan') return <PlanScreen onBack={()=>setView('profile')} hasTrainer={hasTrainer} onPick={()=>setHasTrainer(true)}/>;
   if(view==='trainer') return <TrainerView onBack={()=>setView('profile')}/>;
@@ -27,18 +41,18 @@ function PerfilScreen({light,onToggle}){
         {/* Header */}
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:8,marginBottom:22}}>
           <div style={{width:84,height:84,borderRadius:'50%',background:`linear-gradient(135deg, var(--gb-elev), var(--gb-surface))`,border:`1px solid ${BDEF}`,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14}}>
-            <span style={{fontFamily:DSP,fontWeight:700,fontSize:30,color:TEXT1}}>AM</span>
+            <span style={{fontFamily:DSP,fontWeight:700,fontSize:30,color:TEXT1}}>{iniciales}</span>
           </div>
-          <div style={{fontFamily:DSP,fontWeight:700,fontSize:24,color:TEXT1,letterSpacing:'-0.01em'}}>Álex Moreno</div>
-          <div style={{fontFamily:UI,fontSize:13,color:TEXT2,marginTop:2}}>@alexmoreno</div>
-          <div style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',marginTop:8}}>Miembro desde enero 2025</div>
+          <div style={{fontFamily:DSP,fontWeight:700,fontSize:24,color:TEXT1,letterSpacing:'-0.01em'}}>{nombre}</div>
+          <div style={{fontFamily:UI,fontSize:13,color:TEXT2,marginTop:2}}>{me&&me.username?'@'+me.username:''}</div>
+          <div style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',marginTop:8}}>{alta}</div>
         </div>
 
         {/* Goal */}
         <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:R,padding:'15px 17px',marginBottom:12,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div>
             <div style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:5}}>Tu objetivo</div>
-            <div style={{fontFamily:UI,fontWeight:500,fontSize:16,color:TEXT1}}>Ganar músculo</div>
+            <div style={{fontFamily:UI,fontWeight:500,fontSize:16,color:TEXT1}}>{me&&me.goal?me.goal:'—'}</div>
           </div>
           <button style={{width:34,height:34,borderRadius:R,background:'transparent',border:`1px solid ${BDEF}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',outline:'none'}}><Icon name="pencil" size={15} color={TEXT2}/></button>
         </div>

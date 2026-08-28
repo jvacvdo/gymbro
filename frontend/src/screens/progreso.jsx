@@ -1,6 +1,6 @@
 // GymBro — Progreso: 3-level filters, dynamic chart, records, stagnation alert
 const P = window.GB;
-const { useState:useStateP } = React;
+const { useState:useStateP, useEffect:useEffectP } = React;
 
 function ProgresoScreen(){
   const { BG,CARD,ELEV,OW,SAGE,STEEL,AMBER,BORDER,BDEF,BSTRONG,TEXT1,TEXT2,TEXT3,UI,DSP,MONO,R,
@@ -14,13 +14,22 @@ function ProgresoScreen(){
   const muscles=Object.keys(TAXONOMY[group]);
   const exercises=TAXONOMY[group][muscle];
 
-  const CHART={'Press banca':[60,68,72,78,84,92,100],'Press inclinado':[40,44,50,54,58,62,68],
-    'Sentadilla':[80,90,100,110,120,135,150],'Jalón al pecho':[50,54,58,62,66,70,74]}[exercise]||[30,34,38,42,46,50,55];
-  const last=CHART[CHART.length-1], first=CHART[0], gain=last-first;
-  const stagnating=muscle==='Tríceps'||exercise==='Aperturas';
+  const [data,setData]=useStateP({chart:[],records:[],stagnating:false});
 
-  const RECORDS={'Press banca':[['1RM','100 kg','+5 kg'],['Vol. máx','2,140 kg','+8%'],['Reps máx','12 @ 70kg','+2']],
-  }[exercise]||[['1RM',`${last} kg`,`+${Math.round(gain*0.4)} kg`],['Vol. máx',`${last*22} kg`,'+6%'],['Reps máx',`10 @ ${Math.round(last*0.7)}kg`,'+1']];
+  useEffectP(()=>{
+    let alive=true;
+    P.api.getExerciseProgress(exercise)
+      .then(r=>{ if(alive) setData({chart:r.chart||[],records:r.records||[],stagnating:!!r.stagnating}); })
+      .catch(()=>{ if(alive) setData({chart:[],records:[],stagnating:false}); });
+    return ()=>{alive=false;};
+  },[exercise]);
+
+  const CHART=data.chart, RECORDS=data.records, stagnating=data.stagnating;
+  const last=CHART.length?CHART[CHART.length-1]:0;
+  const first=CHART.length?CHART[0]:0;
+  const gain=last-first;
+  const gainPct=first?Math.round((gain/first)*100):0;
+  const gainRing=last?Math.min(gain/last+0.3,0.95):0;
 
   return(
     <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
@@ -70,7 +79,7 @@ function ProgresoScreen(){
         <div style={{display:'flex',justifyContent:'space-around',marginBottom:22}}>
           <ProgressRing size={92} progress={0.82} value={`${last}`} label="kg máx" color="sage" sw={4}/>
           <ProgressRing size={92} progress={0.6} value="18" label="sesiones" color="steel" sw={4}/>
-          <ProgressRing size={92} progress={Math.min(gain/last+0.3,0.95)} value={`+${Math.round((gain/first)*100)}%`} label="carga" color="sage" sw={4}/>
+          <ProgressRing size={92} progress={gainRing} value={`+${gainPct}%`} label="carga" color="sage" sw={4}/>
         </div>
 
         {/* chart */}
@@ -79,7 +88,9 @@ function ProgresoScreen(){
             <span style={{fontFamily:UI,fontWeight:500,fontSize:14,color:TEXT1}}>{exercise}</span>
             <span style={{fontFamily:MONO,fontSize:9,color:STEEL,letterSpacing:'0.08em',textTransform:'uppercase'}}>Carga máx · kg</span>
           </div>
-          <LineChart data={CHART} prIndex={[CHART.length-1]} color={STEEL}/>
+          {CHART.length
+            ? <LineChart data={CHART} prIndex={[CHART.length-1]} color={STEEL}/>
+            : <div style={{height:96,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:UI,fontSize:12.5,color:TEXT3}}>Sin registros de {exercise} todavía</div>}
           <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
             {['Mar','Abr','May','Jun'].map(m=><span key={m} style={{fontFamily:MONO,fontSize:8,color:TEXT3,letterSpacing:'0.06em'}}>{m}</span>)}
           </div>

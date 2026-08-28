@@ -33,7 +33,16 @@ function GoogleG({size=18}){
 }
 function LoginScreen({onBack,onDone,onToRegister}){
   const [f,setF]=useStateA({email:'',pass:''});
+  const [err,setErr]=useStateA('');
+  const [busy,setBusy]=useStateA(false);
   const set=k=>e=>setF(v=>({...v,[k]:e.target.value}));
+  const submit=async()=>{
+    if(busy) return;
+    setErr(''); setBusy(true);
+    try{ await window.GB.api.login(f.email,f.pass); onDone(); }
+    catch(e){ setErr(e.message||'No se pudo iniciar sesión'); }
+    finally{ setBusy(false); }
+  };
   return(
     <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
       <StatusBar/>
@@ -45,7 +54,8 @@ function LoginScreen({onBack,onDone,onToRegister}){
         <div style={{fontFamily:DSP,fontWeight:700,fontSize:30,color:TEXT1,letterSpacing:'-0.02em',marginBottom:24}}>Bienvenido de vuelta</div>
         <Field label="Email" type="email" placeholder="alex@correo.com" value={f.email} onChange={set('email')}/>
         <Field label="Contraseña" type="password" placeholder="••••••••" value={f.pass} onChange={set('pass')}/>
-        <div style={{marginTop:10}}><PrimaryBtn onClick={onDone}>Iniciar sesión</PrimaryBtn></div>
+        {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginTop:4}}>{err}</div>}
+        <div style={{marginTop:10}}><PrimaryBtn onClick={submit} disabled={busy}>{busy?'Entrando…':'Iniciar sesión'}</PrimaryBtn></div>
         <div style={{textAlign:'center',marginTop:10,marginBottom:18}}>
           <GhostLink onClick={()=>{}}>¿Olvidaste tu contraseña?</GhostLink>
         </div>
@@ -54,7 +64,7 @@ function LoginScreen({onBack,onDone,onToRegister}){
           <span style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>o continúa con</span>
           <div style={{flex:1,height:1,background:BORDER}}></div>
         </div>
-        <button onClick={onDone} style={{width:'100%',height:52,background:CARD,border:`1px solid ${BDEF}`,borderRadius:R,cursor:'pointer',outline:'none',position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <button onClick={()=>setErr('El acceso con Google todavía no está conectado.')} style={{width:'100%',height:52,background:CARD,border:`1px solid ${BDEF}`,borderRadius:R,cursor:'pointer',outline:'none',position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
           <span style={{position:'absolute',left:18,display:'flex'}}><GoogleG size={19}/></span>
           <span style={{fontFamily:UI,fontWeight:500,fontSize:15,color:TEXT1}}>Iniciar sesión con Google</span>
         </button>
@@ -102,6 +112,24 @@ function RegisterScreen({onBack,onDone,onToLogin}){
   const setAk=k=>e=>setA(s=>({...s,[k]:e.target.value}));
   const setMk=k=>e=>setM(s=>({...s,[k]:e.target.value}));
   const back=()=>step===0?onBack():setStep(step-1);
+  const [err,setErr]=useStateA('');
+  const [busy,setBusy]=useStateA(false);
+  const submit=async()=>{
+    if(busy) return;
+    setErr(''); setBusy(true);
+    try{
+      await window.GB.api.register({
+        name:a.name, username:a.user, email:a.email, password:a.pass,
+        goal:q.goal, experience:q.exp, frequency:q.freq,
+        weight:m.weight?Number(m.weight):null,
+        height:m.height?Number(m.height):null,
+        age:m.age?Number(m.age):null,
+        sex:m.sex,
+      });
+      onDone();
+    }catch(e){ setErr(e.message||'No se pudo crear la cuenta'); }
+    finally{ setBusy(false); }
+  };
 
   const GOALS=['Ganar músculo y fuerza','Perder grasa corporal','Mejorar mi rendimiento físico','Mantenerme activo y saludable'];
   const EXP=['Soy nuevo, menos de 6 meses','Entre 6 meses y 2 años','Más de 2 años','Entrené antes y estoy volviendo'];
@@ -162,7 +190,8 @@ function RegisterScreen({onBack,onDone,onToLogin}){
                 <div style={{fontFamily:UI,fontSize:12,color:TEXT2,lineHeight:1.45}}>Otros usuarios pueden escanearlo para entrenarse contigo.</div>
               </div>
             </div>
-            <PrimaryBtn onClick={onDone}>Crear cuenta</PrimaryBtn>
+            {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginBottom:8}}>{err}</div>}
+            <PrimaryBtn onClick={submit} disabled={busy||a.pass!==a.pass2}>{busy?'Creando…':'Crear cuenta'}</PrimaryBtn>
             <div style={{textAlign:'center',marginTop:14}}>
               <GhostLink onClick={onToLogin}>¿Ya tienes cuenta? <span style={{color:TEXT1}}>Inicia sesión</span></GhostLink>
             </div>
