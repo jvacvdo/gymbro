@@ -68,6 +68,11 @@ export function updateMe(patch) {
   return request('/me', { method: 'PATCH', body: patch });
 }
 
+// ── Stats ─────────────────────────────────────────────
+export function getStats() {
+  return request('/stats');
+}
+
 // ── Taxonomy ──────────────────────────────────────────
 export function getTaxonomy() {
   return request('/taxonomy', { auth: false });
@@ -102,6 +107,7 @@ export default {
   getToken, setToken, clearToken,
   register, login, logout,
   getMe, updateMe,
+  getStats,
   getTaxonomy,
   getSessions, getNextSession, createSession, updateSession,
   getMuscleProgress, getExerciseProgress,

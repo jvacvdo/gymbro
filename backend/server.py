@@ -473,7 +473,62 @@ async def progress_exercise(
         last3_peak = max(maxes[-3:])
         stagnating = last3_peak <= before_peak
 
-    return {"chart": chart, "records": records, "stagnating": stagnating}
+    return {
+        "chart": chart,
+        "records": records,
+        "stagnating": stagnating,
+        "sessions": len(rows),
+    }
+
+
+# ── Stats ────────────────────────────────────────────────
+def _streak_weeks(dates: List[str]) -> int:
+    """Semanas consecutivas con al menos una sesion entrenada.
+
+    Una racha diaria no dice nada en una app de gimnasio: nadie entrena los
+    siete dias. Lo que el usuario reconoce como "no faltar" es no saltarse
+    ninguna semana, asi que contamos semanas ISO hacia atras desde la actual.
+    Si la ultima sesion es de hace mas de una semana, la racha esta rota.
+    """
+    if not dates:
+        return 0
+    weeks = {date.fromisoformat(d).isocalendar()[:2] for d in dates}
+    today = datetime.now(timezone.utc).date()
+    cursor = today
+    # Tolerancia de una semana: entrenar el lunes no deberia romper la racha
+    # solo porque aun no ha habido sesion en la semana en curso.
+    if cursor.isocalendar()[:2] not in weeks:
+        cursor -= timedelta(weeks=1)
+    streak = 0
+    while cursor.isocalendar()[:2] in weeks:
+        streak += 1
+        cursor -= timedelta(weeks=1)
+    return streak
+
+
+@api.get("/stats")
+async def stats(user: dict = Depends(get_current_user)):
+    """Resumen del atleta para la pantalla de perfil."""
+    cursor = db.sessions.find(
+        {"user_id": user["_id"], "status": "entrenado"}, {"date": 1}
+    )
+    dates = [s["date"] async for s in cursor]
+
+    agg = db.setlogs.aggregate(
+        [
+            {"$match": {"user_id": user["_id"], "done": True}},
+            {"$group": {"_id": None, "vol": {"$sum": {"$multiply": ["$kg", "$reps"]}}}},
+        ]
+    )
+    volume = 0.0
+    async for row in agg:
+        volume = row["vol"]
+
+    return {
+        "sessions": len(dates),
+        "volume_kg": round(volume),
+        "streak_weeks": _streak_weeks(dates),
+    }
 
 
 @api.get("/health")

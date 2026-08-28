@@ -15,10 +15,12 @@ function PerfilScreen({light,onToggle}){
   const [view,setView]=useStatePF('profile');   // profile | plan | trainer
   const [hasTrainer,setHasTrainer]=useStatePF(true);   // Trainer plan purchased?
   const [me,setMe]=useStatePF(null);
+  const [stats,setStats]=useStatePF(null);
 
   useEffectPF(()=>{
     let alive=true;
     PF.api.getMe().then(u=>{ if(alive) setMe(u); }).catch(()=>{});
+    PF.api.getStats().then(s=>{ if(alive) setStats(s); }).catch(()=>{});
     return ()=>{alive=false;};
   },[]);
 
@@ -28,6 +30,34 @@ function PerfilScreen({light,onToggle}){
   const alta = me && me.created_at
     ? (d=>`Miembro desde ${MESES[d.getMonth()]} ${d.getFullYear()}`)(new Date(me.created_at))
     : '';
+
+  // Volumen acumulado: en kg hasta 1000, luego k y M. Un numero de siete
+  // cifras no cabe en la columna y tampoco se lee de un vistazo.
+  const fmtVol = kg =>
+    kg>=1e6 ? `${(kg/1e6).toFixed(1)}M kg`
+    : kg>=1e3 ? `${Math.round(kg/1e3)}k kg`
+    : `${kg} kg`;
+
+  const sesiones = stats ? stats.sessions : 0;
+  const semanas  = stats ? stats.streak_weeks : 0;
+  const STATS = [
+    ['Sesiones', String(sesiones)],
+    ['Volumen',  fmtVol(stats ? stats.volume_kg : 0)],
+    ['Racha',    semanas===1?'1 sem':`${semanas} sem`],
+  ];
+  const frase =
+    sesiones===0 ? 'Aún no has entrenado. Tu primera sesión empieza aquí.'
+    : semanas>=2 ? `Llevas ${semanas} semanas sin faltar. Eso se nota.`
+    : 'Buen comienzo. Lo que cuenta ahora es repetir.';
+
+  // Datos del registro. Se piden al crear la cuenta, asi que devolverlos
+  // visibles es parte del trato.
+  const FISICO = me ? [
+    ['Peso',   me.weight!=null?`${me.weight} kg`:null],
+    ['Altura', me.height!=null?`${me.height} cm`:null],
+    ['Edad',   me.age!=null?`${me.age} años`:null],
+    ['Sexo',   me.sex||null],
+  ].filter(([,v])=>v) : [];
 
   if(view==='plan') return <PlanScreen onBack={()=>setView('profile')} hasTrainer={hasTrainer} onPick={()=>setHasTrainer(true)}/>;
   if(view==='trainer') return <TrainerView onBack={()=>setView('profile')}/>;
@@ -60,18 +90,33 @@ function PerfilScreen({light,onToggle}){
         {/* Motivational */}
         <div style={{background:'rgba(138,162,192,0.09)',border:`1px solid rgba(138,162,192,0.22)`,borderRadius:R,padding:'15px 17px',marginBottom:16}}>
           <div style={{fontFamily:MONO,fontSize:9,color:STEEL,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:7}}>Esta semana</div>
-          <div style={{fontFamily:DSP,fontWeight:400,fontSize:19,color:TEXT1,lineHeight:1.25,letterSpacing:'-0.01em'}}>Llevas 3 semanas sin faltar. Eso se nota.</div>
+          <div style={{fontFamily:DSP,fontWeight:400,fontSize:19,color:TEXT1,lineHeight:1.25,letterSpacing:'-0.01em'}}>{frase}</div>
         </div>
 
         {/* Stats strip */}
         <div style={{display:'flex',background:CARD,border:`1px solid ${BORDER}`,borderRadius:R,padding:'16px 0',marginBottom:24}}>
-          {[['Sesiones','148'],['Volumen','2.1M kg'],['Racha','21 días']].map(([l,v],i)=>(
+          {STATS.map(([l,v],i)=>(
             <div key={l} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:5,borderRight:i<2?`1px solid ${BORDER}`:'none'}}>
               <span style={{fontFamily:MONO,fontSize:8.5,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>{l}</span>
               <span style={{fontFamily:DSP,fontWeight:700,fontSize:20,color:TEXT1,lineHeight:1}}>{v}</span>
             </div>
           ))}
         </div>
+
+        {/* Datos fisicos */}
+        {FISICO.length>0&&(
+          <>
+            <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:10}}>Tus datos</div>
+            <div style={{display:'flex',flexWrap:'wrap',background:CARD,border:`1px solid ${BORDER}`,borderRadius:R,padding:'4px 0',marginBottom:24}}>
+              {FISICO.map(([l,v])=>(
+                <div key={l} style={{width:'50%',display:'flex',flexDirection:'column',gap:4,padding:'12px 17px'}}>
+                  <span style={{fontFamily:MONO,fontSize:8.5,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>{l}</span>
+                  <span style={{fontFamily:UI,fontWeight:500,fontSize:15,color:TEXT1,lineHeight:1}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Apariencia */}
         <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:10}}>Apariencia</div>

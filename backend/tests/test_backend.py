@@ -256,3 +256,39 @@ def test_progress_exercise_stagnating(s, demo_headers):
     data = r.json()
     assert len(data["chart"]) == 7
     assert data["stagnating"] is True
+
+
+# ── stats ──
+def test_stats_demo(s, demo_headers):
+    r = s.get(f"{API}/stats", headers=demo_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert set(data) == {"sessions", "volume_kg", "streak_weeks"}
+    # El demo se siembra con sesiones entrenadas y setlogs reales.
+    assert data["sessions"] > 0
+    assert data["volume_kg"] > 0
+    assert isinstance(data["streak_weeks"], int) and data["streak_weeks"] >= 0
+
+
+def test_stats_requires_auth(s):
+    assert s.get(f"{API}/stats").status_code in (401, 403)
+
+
+def test_stats_new_user_is_zeroed(s):
+    """Una cuenta recien creada no puede heredar estadisticas de nadie."""
+    uid = uuid.uuid4().hex[:8]
+    r = s.post(f"{API}/auth/register", json={
+        "name": "Stats Cero", "username": f"TEST_{uid}", "email": f"TEST_{uid}@example.com",
+        "password": "test1234", "goal": "Ganar músculo y fuerza",
+        "experience": "Más de 2 años", "frequency": "3–4 días",
+    })
+    assert r.status_code == 200, r.text
+    headers = {"Authorization": f"Bearer {r.json()['token']}"}
+    data = s.get(f"{API}/stats", headers=headers).json()
+    assert data == {"sessions": 0, "volume_kg": 0, "streak_weeks": 0}
+
+
+def test_progress_reports_session_count(s, demo_headers):
+    r = s.get(f"{API}/progress", headers=demo_headers, params={"exercise": "Press banca"})
+    assert r.status_code == 200
+    assert r.json()["sessions"] > 0

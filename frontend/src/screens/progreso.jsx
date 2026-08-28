@@ -14,17 +14,18 @@ function ProgresoScreen(){
   const muscles=Object.keys(TAXONOMY[group]);
   const exercises=TAXONOMY[group][muscle];
 
-  const [data,setData]=useStateP({chart:[],records:[],stagnating:false});
+  const [data,setData]=useStateP({chart:[],records:[],stagnating:false,sessions:0});
 
   useEffectP(()=>{
     let alive=true;
     P.api.getExerciseProgress(exercise)
-      .then(r=>{ if(alive) setData({chart:r.chart||[],records:r.records||[],stagnating:!!r.stagnating}); })
-      .catch(()=>{ if(alive) setData({chart:[],records:[],stagnating:false}); });
+      .then(r=>{ if(alive) setData({chart:r.chart||[],records:r.records||[],stagnating:!!r.stagnating,sessions:r.sessions||0}); })
+      .catch(()=>{ if(alive) setData({chart:[],records:[],stagnating:false,sessions:0}); });
     return ()=>{alive=false;};
   },[exercise]);
 
   const CHART=data.chart, RECORDS=data.records, stagnating=data.stagnating;
+  const sesiones=data.sessions;
   const last=CHART.length?CHART[CHART.length-1]:0;
   const first=CHART.length?CHART[0]:0;
   const gain=last-first;
@@ -77,8 +78,8 @@ function ProgresoScreen(){
 
         {/* rings */}
         <div style={{display:'flex',justifyContent:'space-around',marginBottom:22}}>
-          <ProgressRing size={92} progress={0.82} value={`${last}`} label="kg máx" color="sage" sw={4}/>
-          <ProgressRing size={92} progress={0.6} value="18" label="sesiones" color="steel" sw={4}/>
+          <ProgressRing size={92} progress={last?0.82:0} value={`${last}`} label="kg máx" color="sage" sw={4}/>
+          <ProgressRing size={92} progress={Math.min(sesiones/20,0.95)} value={`${sesiones}`} label="sesiones" color="steel" sw={4}/>
           <ProgressRing size={92} progress={gainRing} value={`+${gainPct}%`} label="carga" color="sage" sw={4}/>
         </div>
 
