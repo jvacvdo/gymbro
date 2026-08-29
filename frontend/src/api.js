@@ -95,6 +95,26 @@ export function updateSession(id, { muscles, status } = {}) {
   return request(`/sessions/${id}`, { method: 'PATCH', body: { muscles, status } });
 }
 
+// ── Conexiones ────────────────────────────────────────
+export function searchUsers(q) {
+  return request('/users/search', { query: { q } });
+}
+export function getConnections() {
+  return request('/connections');
+}
+export function addConnection(username) {
+  return request('/connections', { method: 'POST', body: { username } });
+}
+export function respondConnection(id, action) {
+  return request(`/connections/${id}`, { method: 'PATCH', body: { action } });
+}
+export function removeConnection(id) {
+  return request(`/connections/${id}`, { method: 'DELETE' });
+}
+export function getConnectionSession(id) {
+  return request(`/connections/${id}/session`);
+}
+
 // ── Progress ──────────────────────────────────────────
 export function getMuscleProgress(muscle) {
   return request('/progress/muscle', { query: { muscle } });
@@ -110,5 +130,7 @@ export default {
   getStats,
   getTaxonomy,
   getSessions, getNextSession, createSession, updateSession,
+  searchUsers, getConnections, addConnection, respondConnection,
+  removeConnection, getConnectionSession,
   getMuscleProgress, getExerciseProgress,
 };

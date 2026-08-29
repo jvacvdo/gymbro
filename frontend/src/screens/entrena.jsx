@@ -71,6 +71,11 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
   const [mi,setMi]=useStateE(0);   // active muscle index
   const [ei,setEi]=useStateE(0);   // active exercise index
 
+  /* Id de la sesion en el backend. Se crea al arrancar y se va actualizando,
+     asi lo registrado sobrevive a cerrar la app a media sesion. */
+  const [sessionId,setSessionId]=useStateE(null);
+  const persiste = context.mode!=='trainer';   // la rutina de un cliente aun no se guarda
+
   const build=()=>{
     const s=Object.keys(picked).map(m=>({
       muscle:m, status:'pending',
@@ -79,6 +84,11 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
       ]})),
     }));
     setSession(s); setStage('panel');
+    if(persiste){
+      E.api.createSession(s,{status:'planificado',date:date||E.todayISO()})
+        .then(r=>setSessionId(r&&r.id))
+        .catch(()=>{});   // sin id se cae al guardado final de siempre
+    }
   };
   const enterMuscle=(idx)=>{
     setSession(s=>s.map((m,i)=>i===idx&&m.status==='pending'?{...m,status:'progress'}:m));
@@ -107,12 +117,30 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
 
   const [saveErr,setSaveErr]=useStateE('');
   const [saving,setSaving]=useStateE(false);
+  const [autoSaved,setAutoSaved]=useStateE(false);
+
+  /* Autoguardado. Cada cambio en las series se manda con una pausa corta,
+     para no lanzar una peticion por cada toque en los steppers. */
+  useEffectE(()=>{
+    if(!persiste||!sessionId||!session.length) return;
+    const t=setTimeout(()=>{
+      E.api.updateSession(sessionId,{muscles:session})
+        .then(()=>{ setAutoSaved(true); setSaveErr(''); })
+        .catch(()=>{});   // el guardado final vuelve a intentarlo
+    },900);
+    return ()=>clearTimeout(t);
+  },[session,sessionId,persiste]);
   /* Persiste la sesion completa antes de mostrar el resumen. Si el guardado
      falla no bloqueamos al usuario: pasa al resumen con el aviso. */
   const finishSession=async()=>{
     if(saving) return;
     setSaving(true); setSaveErr('');
-    try{ await E.api.createSession(session,{status:'entrenado',date:date||E.todayISO()}); }
+    try{
+      /* Si el autoguardado creo la sesion, se cierra esa. Crear otra
+         duplicaria el entreno en el calendario y en las estadisticas. */
+      if(persiste&&sessionId) await E.api.updateSession(sessionId,{muscles:session,status:'entrenado'});
+      else await E.api.createSession(session,{status:'entrenado',date:date||E.todayISO()});
+    }
     catch(e){ setSaveErr('No se pudo guardar la sesión: '+(e.message||'error')); }
     finally{ setSaving(false); setStage('summary'); }
   };
@@ -177,7 +205,7 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
           <div style={{position:'relative'}}>
             {!allDone&&(
               <div style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase',textAlign:'center',marginBottom:9}}>
-                {session.filter(m=>m.status!=='done').length} sin terminar · se guardan igual
+                {session.filter(m=>m.status!=='done').length} sin terminar{autoSaved?' · guardado':' · se guardan igual'}
               </div>
             )}
             <PrimaryBtn onClick={finishSession} disabled={saving} color={OW} icon="check">{saving?'Guardando…':'Finalizar sesión'}</PrimaryBtn>
@@ -185,14 +213,16 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
         </div>
       )}
 
-      <BottomSheet open={confirmExit} onClose={()=>setConfirmExit(false)} title="¿Salir sin guardar?">
+      <BottomSheet open={confirmExit} onClose={()=>setConfirmExit(false)} title={autoSaved?'¿Terminar la sesión?':'¿Salir sin guardar?'}>
         <div style={{fontFamily:UI,fontSize:13.5,color:TEXT2,lineHeight:1.5,marginBottom:18}}>
-          Tienes series registradas en esta sesión. Si sales ahora se pierden.
+          {autoSaved
+            ? 'Lo que llevas registrado ya está guardado. Puedes darla por terminada o dejarla a medias y seguir después.'
+            : 'Tienes series registradas en esta sesión. Si sales ahora se pierden.'}
         </div>
         <div style={{marginBottom:10}}>
-          <PrimaryBtn onClick={()=>{setConfirmExit(false);finishSession();}} color={OW} icon="check">Guardar y salir</PrimaryBtn>
+          <PrimaryBtn onClick={()=>{setConfirmExit(false);finishSession();}} color={OW} icon="check">{autoSaved?'Terminar sesión':'Guardar y salir'}</PrimaryBtn>
         </div>
-        <OutlineBtn onClick={()=>{setConfirmExit(false);onExit();}}>Salir sin guardar</OutlineBtn>
+        <OutlineBtn onClick={()=>{setConfirmExit(false);onExit();}}>{autoSaved?'Dejar a medias':'Salir sin guardar'}</OutlineBtn>
       </BottomSheet>
     </div>
   );

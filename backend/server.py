@@ -531,6 +531,183 @@ async def stats(user: dict = Depends(get_current_user)):
     }
 
 
+# ── Conexiones (GymBro / GymSis) ─────────────────────────
+class ConnectionIn(BaseModel):
+    username: str
+
+
+class ConnectionAction(BaseModel):
+    action: str  # accept | reject
+
+
+def _peer_id(conn: dict, me):
+    """El otro extremo de la conexion."""
+    return conn["b_user_id"] if conn["a_user_id"] == me else conn["a_user_id"]
+
+
+async def _trained_today(user_id) -> bool:
+    return await db.sessions.find_one(
+        {"user_id": user_id, "date": date.today().isoformat(), "status": "entrenado"}
+    ) is not None
+
+
+async def _shape_connection(conn: dict, me) -> dict:
+    peer = await db.users.find_one({"_id": _peer_id(conn, me)})
+    if not peer:
+        return None
+    last = await db.sessions.find_one(
+        {"user_id": peer["_id"], "status": "entrenado"}, sort=[("date", -1)]
+    )
+    days = None
+    if last:
+        days = (date.today() - date.fromisoformat(last["date"])).days
+    return {
+        "id": str(conn["_id"]),
+        "name": peer.get("name", ""),
+        "username": peer.get("username", ""),
+        "sex": peer.get("sex"),
+        "status": conn["status"],
+        # Quien envio la solicitud decide si el otro ve "aceptar" o "pendiente".
+        "incoming": conn["requested_by"] != me,
+        "today": await _trained_today(peer["_id"]),
+        "days_since": days,
+    }
+
+
+@api.get("/users/search")
+async def search_users(q: str = Query(..., min_length=2), user: dict = Depends(get_current_user)):
+    """Busca por username o nombre. Nunca devuelve email: es una lista publica."""
+    rx = {"$regex": re.escape(q), "$options": "i"}
+    cursor = db.users.find(
+        {"$or": [{"username": rx}, {"name": rx}], "_id": {"$ne": user["_id"]}}
+    ).limit(20)
+    found = [u async for u in cursor]
+
+    # Marcar los que ya tienen conexion para no ofrecer "Agregar" dos veces.
+    linked = {}
+    async for c in db.connections.find(
+        {"$or": [{"a_user_id": user["_id"]}, {"b_user_id": user["_id"]}]}
+    ):
+        linked[_peer_id(c, user["_id"])] = c["status"]
+
+    return [
+        {
+            "name": u.get("name", ""),
+            "username": u.get("username", ""),
+            "sex": u.get("sex"),
+            "connection": linked.get(u["_id"]),
+        }
+        for u in found
+    ]
+
+
+@api.get("/connections")
+async def list_connections(user: dict = Depends(get_current_user)):
+    cursor = db.connections.find(
+        {"$or": [{"a_user_id": user["_id"]}, {"b_user_id": user["_id"]}]}
+    )
+    out = []
+    async for c in cursor:
+        shaped = await _shape_connection(c, user["_id"])
+        if shaped:
+            out.append(shaped)
+    # Primero las solicitudes que esperan respuesta del usuario.
+    out.sort(key=lambda x: (x["status"] == "accepted", not x["incoming"]))
+    return out
+
+
+@api.post("/connections")
+async def create_connection(body: ConnectionIn, user: dict = Depends(get_current_user)):
+    peer = await db.users.find_one({"username": body.username})
+    if not peer:
+        raise HTTPException(status_code=404, detail="No existe ese usuario")
+    if peer["_id"] == user["_id"]:
+        raise HTTPException(status_code=400, detail="No puedes conectarte contigo")
+    existing = await db.connections.find_one(
+        {
+            "$or": [
+                {"a_user_id": user["_id"], "b_user_id": peer["_id"]},
+                {"a_user_id": peer["_id"], "b_user_id": user["_id"]},
+            ]
+        }
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya hay una solicitud con esa persona")
+    doc = {
+        "a_user_id": user["_id"],
+        "b_user_id": peer["_id"],
+        "status": "pending",
+        "requested_by": user["_id"],
+        "created_at": now_iso(),
+    }
+    res = await db.connections.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    return await _shape_connection(doc, user["_id"])
+
+
+@api.patch("/connections/{conn_id}")
+async def respond_connection(
+    conn_id: str, body: ConnectionAction, user: dict = Depends(get_current_user)
+):
+    try:
+        oid = ObjectId(conn_id)
+    except InvalidId:
+        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+    conn = await db.connections.find_one({"_id": oid})
+    if not conn or user["_id"] not in (conn["a_user_id"], conn["b_user_id"]):
+        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+    # Solo el destinatario responde: aceptar la propia solicitud la haria inutil.
+    if conn["requested_by"] == user["_id"]:
+        raise HTTPException(status_code=403, detail="Espera a que te respondan")
+    if body.action == "accept":
+        await db.connections.update_one({"_id": oid}, {"$set": {"status": "accepted"}})
+        fresh = await db.connections.find_one({"_id": oid})
+        return await _shape_connection(fresh, user["_id"])
+    if body.action == "reject":
+        await db.connections.delete_one({"_id": oid})
+        return {"deleted": True}
+    raise HTTPException(status_code=400, detail="Acción no válida")
+
+
+@api.delete("/connections/{conn_id}")
+async def delete_connection(conn_id: str, user: dict = Depends(get_current_user)):
+    try:
+        oid = ObjectId(conn_id)
+    except InvalidId:
+        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+    res = await db.connections.delete_one(
+        {"_id": oid, "$or": [{"a_user_id": user["_id"]}, {"b_user_id": user["_id"]}]}
+    )
+    if not res.deleted_count:
+        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+    return {"deleted": True}
+
+
+@api.get("/connections/{conn_id}/session")
+async def connection_session(conn_id: str, user: dict = Depends(get_current_user)):
+    """Sesion de hoy del companero. Solo si la conexion esta aceptada."""
+    try:
+        oid = ObjectId(conn_id)
+    except InvalidId:
+        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+    conn = await db.connections.find_one({"_id": oid, "status": "accepted"})
+    if not conn or user["_id"] not in (conn["a_user_id"], conn["b_user_id"]):
+        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+    peer_id = _peer_id(conn, user["_id"])
+    s = await db.sessions.find_one(
+        {"user_id": peer_id, "date": date.today().isoformat()}, sort=[("date", -1)]
+    )
+    peer = await db.users.find_one({"_id": peer_id})
+    if not s:
+        return {"name": peer.get("name", ""), "muscles": [], "date": date.today().isoformat()}
+    return {
+        "name": peer.get("name", ""),
+        "date": s["date"],
+        "status": s["status"],
+        "muscles": s.get("muscles", []),
+    }
+
+
 @api.get("/health")
 async def health():
     return {"status": "ok"}
@@ -599,6 +776,9 @@ async def seed_demo():
     async for u in db.users.find({"email": {"$regex": "^TEST_"}}):
         await db.sessions.delete_many({"user_id": u["_id"]})
         await db.setlogs.delete_many({"user_id": u["_id"]})
+        await db.connections.delete_many(
+            {"$or": [{"a_user_id": u["_id"]}, {"b_user_id": u["_id"]}]}
+        )
         await db.users.delete_one({"_id": u["_id"]})
 
     existing = await db.users.find_one({"email": demo_email})
@@ -689,6 +869,8 @@ async def startup():
     await db.sessions.create_index([("user_id", 1), ("date", 1)])
     await db.setlogs.create_index([("user_id", 1), ("exercise_name", 1)])
     await db.setlogs.create_index([("user_id", 1), ("muscle", 1)])
+    await db.connections.create_index([("a_user_id", 1), ("b_user_id", 1)])
+    await db.connections.create_index("b_user_id")
     await seed_exercises()
     await seed_demo()
 

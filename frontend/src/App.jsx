@@ -7,7 +7,9 @@ const { useState } = React;
 
 export default function App() {
   const G = window.GB;
-  const [route, setRoute] = useState('welcome');   // welcome | register | login | app
+  // Con token guardado se entra directo: obligar a iniciar sesion en cada
+  // recarga con la sesion todavia viva no protege nada, solo molesta.
+  const [route, setRoute] = useState(() => (G && G.api && G.api.getToken() ? 'app' : 'welcome'));
   const [tab, setTab] = useState('inicio');
   const [light, setLight] = useState(false);
   const toggle = () => setLight(v => !v);
@@ -34,7 +36,7 @@ export default function App() {
       {tab === 'entrena'  && <G.EntrenaScreen onFinish={() => setTab('inicio')} />}
       {tab === 'gymbro'   && <G.GymBroScreen />}
       {tab === 'progreso' && <G.ProgresoScreen />}
-      {tab === 'perfil'   && <G.PerfilScreen light={light} onToggle={toggle} />}
+      {tab === 'perfil'   && <G.PerfilScreen light={light} onToggle={toggle} onLogout={() => { setTab('inicio'); setRoute('welcome'); }} />}
       <G.TabBar active={tab} onTab={setTab} />
     </React.Fragment>
   );

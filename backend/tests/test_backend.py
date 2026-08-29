@@ -292,3 +292,79 @@ def test_progress_reports_session_count(s, demo_headers):
     r = s.get(f"{API}/progress", headers=demo_headers, params={"exercise": "Press banca"})
     assert r.status_code == 200
     assert r.json()["sessions"] > 0
+
+
+# ── conexiones ──
+def _mk_user(s, tag):
+    """Crea un usuario TEST_* y devuelve (headers, username)."""
+    uid = f"{tag}{uuid.uuid4().hex[:6]}"
+    r = s.post(f"{API}/auth/register", json={
+        "name": f"Test {tag}", "username": f"TEST_{uid}", "email": f"TEST_{uid}@example.com",
+        "password": "test1234", "goal": "Ganar músculo y fuerza",
+        "experience": "Más de 2 años", "frequency": "3–4 días",
+    })
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['token']}"}, f"TEST_{uid}"
+
+
+def test_connection_full_flow(s):
+    a_h, a_user = _mk_user(s, "a")
+    b_h, b_user = _mk_user(s, "b")
+
+    # A encuentra a B por username
+    found = s.get(f"{API}/users/search", headers=a_h, params={"q": b_user}).json()
+    assert any(u["username"] == b_user for u in found)
+    # y la busqueda no filtra emails
+    assert all("email" not in u for u in found)
+
+    # A envia solicitud
+    r = s.post(f"{API}/connections", headers=a_h, json={"username": b_user})
+    assert r.status_code == 200, r.text
+    conn_id = r.json()["id"]
+    assert r.json()["status"] == "pending"
+
+    # Duplicarla se rechaza
+    assert s.post(f"{API}/connections", headers=a_h, json={"username": b_user}).status_code == 400
+
+    # A no puede aceptar su propia solicitud
+    assert s.patch(f"{API}/connections/{conn_id}", headers=a_h,
+                   json={"action": "accept"}).status_code == 403
+
+    # B la ve como entrante y la acepta
+    incoming = s.get(f"{API}/connections", headers=b_h).json()
+    assert incoming[0]["incoming"] is True
+    r = s.patch(f"{API}/connections/{conn_id}", headers=b_h, json={"action": "accept"})
+    assert r.status_code == 200 and r.json()["status"] == "accepted"
+
+    # Ahora A ve a B como companero aceptado
+    mine = s.get(f"{API}/connections", headers=a_h).json()
+    assert mine[0]["status"] == "accepted" and mine[0]["username"] == b_user
+
+    # A puede leer la sesion de B (vacia, pero autorizada)
+    r = s.get(f"{API}/connections/{conn_id}/session", headers=a_h)
+    assert r.status_code == 200 and "muscles" in r.json()
+
+    # Un tercero no puede leerla
+    c_h, _ = _mk_user(s, "c")
+    assert s.get(f"{API}/connections/{conn_id}/session", headers=c_h).status_code == 404
+
+    # Y A puede deshacerla
+    assert s.delete(f"{API}/connections/{conn_id}", headers=a_h).status_code == 200
+    assert s.get(f"{API}/connections", headers=a_h).json() == []
+
+
+def test_cannot_connect_to_self(s):
+    h, user = _mk_user(s, "self")
+    r = s.post(f"{API}/connections", headers=h, json={"username": user})
+    assert r.status_code == 400
+
+
+def test_connection_unknown_user(s):
+    h, _ = _mk_user(s, "unk")
+    assert s.post(f"{API}/connections", headers=h,
+                  json={"username": "no_existe_nadie_asi"}).status_code == 404
+
+
+def test_connections_require_auth(s):
+    assert s.get(f"{API}/connections").status_code in (401, 403)
+    assert s.get(f"{API}/users/search", params={"q": "ab"}).status_code in (401, 403)
