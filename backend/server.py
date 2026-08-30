@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
+    # La siembra del usuario demo BORRA y rehace su historial en cada
+    # arranque. Es util en desarrollo y destructivo en produccion, asi que
+    # solo corre si se pide explicitamente.
+    SEED_DEMO: bool = False
+
     # Envio de correo para recuperar contrasena. Vale cualquier SMTP
     # (Gmail con contrasena de aplicacion, Resend, SendGrid...). Sin
     # SMTP_HOST el envio queda deshabilitado y se avisa por log.
@@ -77,7 +82,11 @@ if os.environ.get("APP_URL"):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(origins),
-    allow_origin_regex=r"https://[a-z0-9-]+\.vercel\.app",
+    allow_origin_regex=(
+        r"https://[a-z0-9-]+\.vercel\.app"
+        r"|https://[a-z0-9-]+\.preview\.emergentagent\.com"
+        r"|https://[a-z0-9-]+\.emergent\.host"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1421,7 +1430,10 @@ async def startup():
     await db.password_resets.create_index("expires_at", expireAfterSeconds=0)
     await seed_exercises()
     await sync_exercise_videos()
-    await seed_demo()
+    if settings.SEED_DEMO:
+        await seed_demo()
+    else:
+        logging.info("SEED_DEMO desactivado: no se toca el usuario demo")
 
 
 app.include_router(api)
