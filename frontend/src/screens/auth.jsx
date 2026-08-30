@@ -263,6 +263,7 @@ function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
   const back=()=>step===0?onBack():setStep(step-1);
   const [err,setErr]=useStateA('');
   const [busy,setBusy]=useStateA(false);
+  const [priv,setPriv]=useStateA(false);
   /* Cierra el onboarding de una cuenta de Google: los datos ya existentes
      se completan, no se crea nada. */
   const guardarOnboarding=async()=>{
@@ -297,6 +298,8 @@ function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
     }catch(e){ setErr(e.message||'No se pudo crear la cuenta'); }
     finally{ setBusy(false); }
   };
+
+  if(priv) return <window.GB.PrivacyScreen onBack={()=>setPriv(false)}/>;
 
   const GOALS=['Ganar músculo y fuerza','Perder grasa corporal','Mejorar mi rendimiento físico','Mantenerme activo y saludable'];
   const EXP=['Soy nuevo, menos de 6 meses','Entre 6 meses y 2 años','Más de 2 años','Entrené antes y estoy volviendo'];
@@ -377,7 +380,11 @@ function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
               </div>
             )}
             <GoogleButton label="Continuar con Google" onDone={r=>onDone(r)} onError={setErr}/>
-            <div style={{textAlign:'center',marginTop:14}}>
+            <div style={{fontFamily:UI,fontSize:11.5,color:TEXT3,textAlign:'center',lineHeight:1.5,marginTop:16}}>
+              Al crear tu cuenta aceptas nuestra{' '}
+              <button onClick={()=>setPriv(true)} style={{background:'none',border:'none',padding:0,cursor:'pointer',fontFamily:UI,fontSize:11.5,color:TEXT2,textDecoration:'underline',outline:'none'}}>política de privacidad</button>.
+            </div>
+            <div style={{textAlign:'center',marginTop:10}}>
               <GhostLink onClick={onToLogin}>¿Ya tienes cuenta? <span style={{color:TEXT1}}>Inicia sesión</span></GhostLink>
             </div>
           </>

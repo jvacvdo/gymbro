@@ -55,6 +55,7 @@ function PerfilScreen({light,onToggle,onLogout}){
   ].filter(([,v])=>v) : [];
 
   if(view==='plan') return <PlanScreen onBack={()=>setView('profile')}/>;
+  if(view==='privacidad') return <PF.PrivacyScreen onBack={()=>setView('profile')}/>;
 
   /* Cada ajuste lleva su accion. Los que aun no existen lo dicen en vez de
      no hacer nada al pulsarlos. */
@@ -63,7 +64,7 @@ function PerfilScreen({light,onToggle,onLogout}){
     ['pencil','Editar perfil',null,()=>{setAviso('');setEdit(true);}],
     ['bell','Notificaciones',null,proximamente],
     ['ruler','Unidades','kg',proximamente],
-    ['shield','Privacidad',null,proximamente],
+    ['shield','Privacidad',null,()=>{setAviso('');setView('privacidad');}],
     ['crown','Plan actual',null,()=>setView('plan')],
     ['logout','Cerrar sesión',null,()=>{PF.api.logout();onLogout&&onLogout();}],
   ];
