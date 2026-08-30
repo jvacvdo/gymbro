@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidad · GymBro</title>
+<meta name="description" content="Qué datos recoge GymBro, para qué los usa y cómo ejercer tus derechos.">
+<!--
+  Version publica de la politica, para poder darla como URL a las tiendas de
+  aplicaciones: Apple y Google la exigen como enlace externo accesible sin
+  instalar nada.
+
+  OJO: el mismo texto vive en frontend/src/screens/legal.jsx, que es lo que se
+  ve dentro de la app. Si cambias uno, cambia el otro.
+
+  Este texto es una base generica, no un documento revisado por un abogado.
+  GymBro recoge peso, edad y sexo, que en el RGPD pueden considerarse datos de
+  salud y tienen requisitos mas estrictos.
+-->
+<style>
+  :root{
+    --bg:#101012; --surface:#17171a; --border:#232327;
+    --text1:#F2F0EB; --text2:#9A9A9F; --text3:#6E6E73; --sage:#9FD89A;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text1);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:680px; margin:0 auto; padding:48px 22px 80px}
+  header{display:flex; align-items:center; gap:10px; margin-bottom:38px}
+  .marca{font-weight:300; font-size:21px; letter-spacing:-0.03em}
+  h1{
+    font-family:Georgia,'Times New Roman',serif; font-weight:700;
+    font-size:34px; letter-spacing:-0.02em; line-height:1.15; margin:0 0 6px;
+  }
+  .fecha{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+    color:var(--text3); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:26px;
+  }
+  .resumen{
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:17px 19px; margin-bottom:34px; color:var(--text2); font-size:15px;
+  }
+  h2{font-size:17px; font-weight:600; margin:34px 0 10px; letter-spacing:-0.01em}
+  p{color:var(--text2); font-size:15px; margin:0 0 11px}
+  a{color:var(--sage)}
+  footer{
+    margin-top:52px; padding-top:22px; border-top:1px solid var(--border);
+    color:var(--text3); font-size:13px;
+  }
+  @media (max-width:520px){ .wrap{padding:32px 18px 60px} h1{font-size:28px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="marca">gymbro</span>
+  </header>
+
+  <h1>Política de privacidad</h1>
+  <div class="fecha">Actualizado el 30 de agosto de 2026</div>
+
+  <div class="resumen">
+    Resumen: guardamos lo que necesitamos para mostrarte tu progreso. No
+    vendemos tus datos ni los usamos para publicidad. Puedes borrar tu cuenta
+    entera cuando quieras.
+  </div>
+
+  <h2>Quién trata tus datos</h2>
+  <p>El responsable del tratamiento es GymBro. Puedes escribirnos a
+     <a href="mailto:josevac95@gmail.com">josevac95@gmail.com</a> para cualquier
+     cuestión relacionada con tus datos o con esta política.</p>
+
+  <h2>Qué datos recogemos</h2>
+  <p>Datos de cuenta: tu nombre, nombre de usuario, correo electrónico y una
+     versión cifrada de tu contraseña. Nunca guardamos tu contraseña en claro y
+     nadie del equipo puede leerla.</p>
+  <p>Datos físicos que nos das al registrarte, todos opcionales salvo tu
+     objetivo: peso, altura, edad y sexo.</p>
+  <p>Datos de entrenamiento: las sesiones que registras, los ejercicios, las
+     series, el peso y las repeticiones, y la fecha de cada una.</p>
+  <p>Datos de tus conexiones: con qué otras personas usuarias estás conectado.</p>
+  <p>Si entras con Google, recibimos de Google tu nombre, tu correo electrónico
+     y un identificador de cuenta. No recibimos tu contraseña de Google ni
+     accedemos a ningún otro dato de tu cuenta.</p>
+
+  <h2>Para qué los usamos</h2>
+  <p>Para darte el servicio: mostrarte tu progreso, calcular tus estadísticas y
+     detectar estancamientos en tus cargas.</p>
+  <p>Para identificarte al iniciar sesión y mantener tu sesión abierta.</p>
+  <p>Para que puedas conectar con otras personas usuarias y ver sus
+     entrenamientos cuando ambas partes lo aceptáis.</p>
+  <p>No usamos tus datos para publicidad, no los vendemos y no los cedemos a
+     terceros con fines comerciales.</p>
+
+  <h2>Qué ven las demás personas</h2>
+  <p>Tu nombre y tu nombre de usuario son visibles en el buscador de la
+     aplicación, para que otras personas puedan encontrarte y enviarte una
+     solicitud. Tu correo electrónico nunca aparece en esas búsquedas.</p>
+  <p>Quien tenga una conexión aceptada contigo puede ver los entrenamientos que
+     registras. Tus datos físicos —peso, altura, edad y sexo— no se comparten
+     con nadie.</p>
+  <p>Puedes deshacer una conexión en cualquier momento desde la pestaña GymBro.</p>
+
+  <h2>Servicios de terceros</h2>
+  <p>Tus datos se almacenan en MongoDB Atlas, un servicio de bases de datos
+     gestionado.</p>
+  <p>La función de entrenador usa Google Gemini. Cuando la utilizas, enviamos a
+     Google tu objetivo, tu experiencia y las cargas calculadas de tu sesión,
+     sin tu nombre ni tu correo.</p>
+  <p>Los vídeos de técnica se reproducen desde YouTube en su modo sin cookies de
+     publicidad. Son contenidos de terceros, ajenos a GymBro.</p>
+
+  <h2>Dónde se guardan</h2>
+  <p>En tu dispositivo guardamos únicamente el identificador de tu sesión, para
+     no pedirte la contraseña cada vez que abres la aplicación. No usamos
+     cookies de seguimiento ni de publicidad.</p>
+
+  <h2>Cuánto tiempo los conservamos</h2>
+  <p>Mientras tu cuenta exista. Cuando borras tu cuenta, eliminamos tu perfil,
+     tus entrenamientos, tus series registradas y tus conexiones.</p>
+  <p>El borrado es inmediato y no se puede deshacer. Puede quedar una copia en
+     nuestras copias de seguridad durante un periodo limitado hasta que estas se
+     renuevan.</p>
+
+  <h2>Tus derechos</h2>
+  <p>Puedes acceder a tus datos y modificarlos desde Perfil › Editar perfil.</p>
+  <p>Puedes borrar tu cuenta y todos tus datos desde Perfil › Borrar mi cuenta.</p>
+  <p>También puedes solicitarnos una copia de tus datos, su rectificación, la
+     limitación de su tratamiento o presentar una reclamación ante la autoridad
+     de protección de datos de tu país. Escríbenos a
+     <a href="mailto:josevac95@gmail.com">josevac95@gmail.com</a>.</p>
+
+  <h2>Menores de edad</h2>
+  <p>GymBro no está dirigida a menores de 16 años. Si detectamos una cuenta de
+     una persona menor de esa edad sin el consentimiento de quien ejerza su
+     tutela, la eliminaremos.</p>
+
+  <h2>Seguridad</h2>
+  <p>Las contraseñas se guardan cifradas con un algoritmo de hash diseñado para
+     ese fin. El acceso a la base de datos está restringido por credenciales y
+     las comunicaciones entre la aplicación y el servidor viajan cifradas.</p>
+  <p>Ningún sistema es infalible. Si detectamos una brecha que afecte a tus
+     datos, te lo comunicaremos.</p>
+
+  <h2>Aviso sobre el entrenamiento</h2>
+  <p>Las sugerencias de carga que verás en la aplicación salen de tu propio
+     historial, no de un profesional. GymBro no da consejo médico ni
+     nutricional. Si tienes molestias o una condición médica, consulta con un
+     especialista antes de seguir.</p>
+
+  <h2>Cambios en esta política</h2>
+  <p>Si cambiamos esta política te avisaremos dentro de la aplicación.</p>
+
+  <footer>
+    GymBro · Última actualización: 30 de agosto de 2026
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,5 +1,9 @@
 // GymBro — Politica de privacidad.
 //
+// El mismo texto vive en frontend/public/privacidad.html, que es la version
+// publica que se da como URL a las tiendas de aplicaciones. Si cambias uno,
+// cambia el otro.
+//
 // AVISO PARA QUIEN MANTENGA ESTO: este texto es una base generica, no un
 // documento revisado por un abogado. GymBro recoge peso, edad y sexo, que en
 // el RGPD europeo pueden considerarse datos de salud y tienen requisitos mas
@@ -51,9 +55,16 @@ const SECCIONES = [
     ],
   },
   {
+    t: 'Servicios de terceros',
+    p: [
+      'Tus datos se almacenan en MongoDB Atlas, un servicio de bases de datos gestionado.',
+      'La función de entrenador usa Google Gemini. Cuando la utilizas, enviamos a Google tu objetivo, tu experiencia y las cargas calculadas de tu sesión, sin tu nombre ni tu correo.',
+      'Los vídeos de técnica se reproducen desde YouTube en su modo sin cookies de publicidad. Son contenidos de terceros, ajenos a GymBro.',
+    ],
+  },
+  {
     t: 'Dónde se guardan',
     p: [
-      'Tus datos se almacenan en MongoDB Atlas, un servicio de bases de datos gestionado, en servidores situados en la región que hemos configurado para la aplicación.',
       'En tu dispositivo guardamos únicamente el identificador de tu sesión, para no pedirte la contraseña cada vez que abres la aplicación. No usamos cookies de seguimiento ni de publicidad.',
     ],
   },
@@ -83,6 +94,12 @@ const SECCIONES = [
     p: [
       'Las contraseñas se guardan cifradas con un algoritmo de hash diseñado para ese fin. El acceso a la base de datos está restringido por credenciales y las comunicaciones entre la aplicación y el servidor viajan cifradas.',
       'Ningún sistema es infalible. Si detectamos una brecha que afecte a tus datos, te lo comunicaremos.',
+    ],
+  },
+  {
+    t: 'Aviso sobre el entrenamiento',
+    p: [
+      'Las sugerencias de carga que verás en la aplicación salen de tu propio historial, no de un profesional. GymBro no da consejo médico ni nutricional. Si tienes molestias o una condición médica, consulta con un especialista antes de seguir.',
     ],
   },
   {
