@@ -1,0 +1,16 @@
+{
+  "_comentario": "ID de YouTube por ejercicio (solo el id, no la URL). Un ejercicio que no aparezca aqui muestra en la app un boton que abre la busqueda de YouTube. Revisa los videos antes de darlos por buenos: se eligieron por titulo, no viendolos enteros.",
+  "videos": {
+    "Press banca": "TAH8RxOS0VI",
+    "Press inclinado": "vUMtItXfO8Y",
+    "Fondos": "CkX5QdEz4IE",
+    "Jalón al pecho": "x2Y6Mb41zjY",
+    "Remo con barra": "3uiWjik2yEQ",
+    "Dominadas": "1s6Bwx6GchI",
+    "Peso muerto": "0XL4cZR2Ink",
+    "Curl con barra": "PY9QylAMtyE",
+    "Press militar": "KLT18ahosQw",
+    "Sentadilla": "qsAkuNORgmk",
+    "Hip thrust": "3SHkXmrQtxQ"
+  }
+}

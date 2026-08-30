@@ -117,6 +117,11 @@ export function updateSession(id, { muscles, status } = {}) {
   return request(`/sessions/${id}`, { method: 'PATCH', body: { muscles, status } });
 }
 
+// ── Videos de tecnica ─────────────────────────────────
+export function getVideos() {
+  return request('/videos', { auth: false });
+}
+
 // ── Entrenador ────────────────────────────────────────
 export function getCoach() {
   return request('/coach');
@@ -161,6 +166,7 @@ export default {
   getStats,
   getTaxonomy,
   getSessions, getNextSession, createSession, updateSession,
+  getVideos,
   getCoach, askCoach,
   searchUsers, getConnections, addConnection, respondConnection,
   removeConnection, getConnectionSession,

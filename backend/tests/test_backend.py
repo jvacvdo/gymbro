@@ -468,3 +468,25 @@ def test_coach_ask_valida_entrada(s):
     assert s.post(f"{API}/coach/ask", headers=h, json={"question": "  "}).status_code in (400, 503)
     assert s.post(f"{API}/coach/ask", headers=h,
                   json={"question": "x" * 500}).status_code in (400, 503)
+
+
+# ── videos de tecnica ──
+def test_videos_publico_y_con_forma(s):
+    r = s.get(f"{API}/videos")
+    assert r.status_code == 200        # catalogo publico, no necesita token
+    d = r.json()
+    assert isinstance(d, dict)
+    # Los ids de YouTube son de 11 caracteres; nunca URLs completas
+    for nombre, vid in d.items():
+        assert isinstance(vid, str) and len(vid) == 11, (nombre, vid)
+        assert "http" not in vid and "/" not in vid
+
+
+def test_videos_apuntan_a_ejercicios_reales(s):
+    videos = s.get(f"{API}/videos").json()
+    if not videos:
+        return
+    tax = s.get(f"{API}/taxonomy").json()
+    reales = {e for grupos in tax.values() for ejs in grupos.values() for e in ejs}
+    for nombre in videos:
+        assert nombre in reales, f"{nombre} no está en la taxonomía"

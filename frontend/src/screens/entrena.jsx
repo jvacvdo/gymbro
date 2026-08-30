@@ -104,6 +104,7 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
      saltarse un ejercicio costase la sesion entera. */
   const hasLoggedSets = session.some(m=>m.exercises.some(e=>e.series.some(x=>x.done)));
   const [confirmExit,setConfirmExit]=useStateE(false);
+  const [verVideo,setVerVideo]=useStateE(null);
   const tryExit = () => hasLoggedSets ? setConfirmExit(true) : onExit();
 
   const finishExercise=()=>{
@@ -239,6 +240,7 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
           <Icon name="dots" size={20} color={TEXT3}/>
         </div>
         <div style={{fontFamily:MONO,fontSize:11,color:TEXT3,letterSpacing:'0.06em',marginBottom:6}}>{muscle.muscle} <span style={{opacity:0.6}}>›</span> </div>
+        <div style={{marginBottom:12}}><E.VideoBtn exercise={exercise.name} onOpen={setVerVideo}/></div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
           <button onClick={()=>setEi(Math.max(0,ei-1))} disabled={ei===0} style={{background:'none',border:'none',cursor:ei===0?'default':'pointer',padding:0,outline:'none',display:'flex',opacity:ei===0?0.25:1}}><Icon name="back" size={22} color={TEXT2}/></button>
           <span style={{fontFamily:DSP,fontWeight:400,fontSize:26,color:TEXT1,letterSpacing:'-0.01em',textAlign:'center',flex:1}}>{exercise.name}</span>
@@ -270,6 +272,7 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
           ? <PrimaryBtn onClick={finishMuscle} color={OW} icon="check">Finalizar músculo</PrimaryBtn>
           : <OutlineBtn onClick={finishExercise} icon="check">Finalizar ejercicio</OutlineBtn>}
       </div>
+      <E.VideoSheet exercise={verVideo} onClose={()=>setVerVideo(null)}/>
     </div>
   );
 

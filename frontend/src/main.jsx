@@ -17,6 +17,7 @@ import './screens/perfil.jsx';
 import './screens/gymbro.jsx';
 import './screens/legal.jsx';
 import './screens/coach.jsx';
+import './screens/video.jsx';
 
 import App from './App.jsx';
 

@@ -1218,6 +1218,16 @@ async def coach_ask(body: CoachAsk, user: dict = Depends(get_current_user)):
     return {"answer": texto, "disclaimer": DESCARGO}
 
 
+@api.get("/videos")
+async def videos():
+    """Videos de tecnica por ejercicio. Los que falten los resuelve el
+    frontend abriendo una busqueda en YouTube."""
+    out = {}
+    async for e in db.exercises.find({"video_id": {"$exists": True, "$ne": None}}):
+        out[e["name"]] = e["video_id"]
+    return out
+
+
 @api.get("/health")
 async def health():
     return {"status": "ok"}
@@ -1266,6 +1276,28 @@ async def seed_exercises():
                 order += 1
     if docs:
         await db.exercises.insert_many(docs)
+
+
+def read_exercise_videos() -> dict:
+    """Mapa ejercicio -> id de YouTube. Fichero opcional."""
+    path = Path(__file__).resolve().parent / "exercise_videos.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("videos", {})
+    except Exception:
+        logging.exception("exercise_videos.json ilegible")
+        return {}
+
+
+async def sync_exercise_videos():
+    """Aplica los videos del fichero a la coleccion.
+
+    Corre en cada arranque, no solo en la siembra: anadir un video nuevo al
+    JSON no deberia obligar a borrar la coleccion de ejercicios.
+    """
+    for nombre, vid in read_exercise_videos().items():
+        await db.exercises.update_many({"name": nombre}, {"$set": {"video_id": vid}})
 
 
 def _mk_series(kg, reps, n=3, by="ti"):
@@ -1385,6 +1417,7 @@ async def startup():
     # Mongo borra solo los tokens caducados: no acumulamos enlaces vivos.
     await db.password_resets.create_index("expires_at", expireAfterSeconds=0)
     await seed_exercises()
+    await sync_exercise_videos()
     await seed_demo()
 
 
