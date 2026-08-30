@@ -205,11 +205,14 @@ function LoginScreen({onBack,onDone,onToRegister}){
         <div style={{textAlign:'center',marginTop:10,marginBottom:18}}>
           <GhostLink onClick={()=>setForgot(true)}>¿Olvidaste tu contraseña?</GhostLink>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}>
-          <div style={{flex:1,height:1,background:BORDER}}></div>
-          <span style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>o continúa con</span>
-          <div style={{flex:1,height:1,background:BORDER}}></div>
-        </div>
+        {/* Sin Google configurado no hay nada que separar. */}
+        {window.GB.api.GOOGLE_CLIENT_ID&&(
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}>
+            <div style={{flex:1,height:1,background:BORDER}}></div>
+            <span style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>o continúa con</span>
+            <div style={{flex:1,height:1,background:BORDER}}></div>
+          </div>
+        )}
         <GoogleButton label="Iniciar sesión con Google" onDone={r=>onDone(r)} onError={setErr}/>
         <div style={{textAlign:'center',marginTop:18}}>
           <GhostLink onClick={onToRegister}>¿No tienes cuenta? <span style={{color:TEXT1}}>Regístrate</span></GhostLink>
@@ -366,11 +369,13 @@ function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
             </div>
             {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginBottom:8}}>{err}</div>}
             <PrimaryBtn onClick={submit} disabled={busy||a.pass!==a.pass2}>{busy?'Creando…':'Crear cuenta'}</PrimaryBtn>
-            <div style={{display:'flex',alignItems:'center',gap:12,margin:'18px 0'}}>
-              <div style={{flex:1,height:1,background:BORDER}}></div>
-              <span style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>o regístrate con</span>
-              <div style={{flex:1,height:1,background:BORDER}}></div>
-            </div>
+            {window.GB.api.GOOGLE_CLIENT_ID&&(
+              <div style={{display:'flex',alignItems:'center',gap:12,margin:'18px 0'}}>
+                <div style={{flex:1,height:1,background:BORDER}}></div>
+                <span style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>o regístrate con</span>
+                <div style={{flex:1,height:1,background:BORDER}}></div>
+              </div>
+            )}
             <GoogleButton label="Continuar con Google" onDone={r=>onDone(r)} onError={setErr}/>
             <div style={{textAlign:'center',marginTop:14}}>
               <GhostLink onClick={onToLogin}>¿Ya tienes cuenta? <span style={{color:TEXT1}}>Inicia sesión</span></GhostLink>
