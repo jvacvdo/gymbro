@@ -267,10 +267,19 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
           </div>
         ))}
       </div>
-      <div style={{position:'absolute',left:20,right:20,bottom:26}}>
+      <div style={{position:'absolute',left:20,right:20,bottom:26,display:'flex',flexDirection:'column',gap:10}}>
         {muscleDone
           ? <PrimaryBtn onClick={finishMuscle} color={OW} icon="check">Finalizar músculo</PrimaryBtn>
           : <OutlineBtn onClick={finishExercise} icon="check">Finalizar ejercicio</OutlineBtn>}
+        {/* En cuanto hay una serie marcada se puede cerrar la sesion desde
+            aqui. Antes solo existia en la pantalla de musculos, asi que habia
+            que retroceder para encontrarlo. */}
+        {hasLoggedSets&&(
+          <button onClick={finishSession} disabled={saving}
+            style={{width:'100%',height:44,background:'transparent',border:`1px solid ${BDEF}`,borderRadius:R,fontFamily:UI,fontWeight:500,fontSize:13.5,color:TEXT2,cursor:saving?'default':'pointer',outline:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:7}}>
+            <Icon name="check" size={14} color={TEXT2}/>{saving?'Guardando…':'Finalizar sesión'}
+          </button>
+        )}
       </div>
       <E.VideoSheet exercise={verVideo} onClose={()=>setVerVideo(null)}/>
     </div>
