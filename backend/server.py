@@ -1087,8 +1087,12 @@ async def _resumen_entrenador(user: dict) -> dict:
     }
 
 
-def _pedir_a_gemini(prompt: str) -> Optional[str]:
-    """Llamada sincrona; se invoca desde un hilo. None si falla."""
+def _pedir_a_gemini(prompt: str):
+    """Devuelve (texto, motivo) con motivo en {ok, bloqueado, error}.
+
+    Distinguir "no puedo responder a eso" de "el servicio esta caido" importa:
+    al usuario se le dice una cosa u otra.
+    """
     import urllib.request
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
@@ -1096,16 +1100,33 @@ def _pedir_a_gemini(prompt: str) -> Optional[str]:
     )
     cuerpo = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 500},
+        "generationConfig": {
+            "temperature": 0.4,
+            "maxOutputTokens": 800,
+            # gemini-2.5-flash razona antes de responder y ese razonamiento
+            # consume el presupuesto de salida. Sin esto la respuesta llegaba
+            # cortada a media frase.
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
     }).encode()
     req = urllib.request.Request(url, data=cuerpo, headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=25) as r:
             data = json.loads(r.read())
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
     except Exception:
         logging.exception("Gemini no respondio")
-        return None
+        return None, "error"
+
+    cands = data.get("candidates") or []
+    if not cands:
+        # Filtro de seguridad de Google: la pregunta no se responde.
+        return None, "bloqueado"
+    cand = cands[0]
+    partes = (cand.get("content") or {}).get("parts") or []
+    texto = "".join(p.get("text", "") for p in partes).strip()
+    if not texto:
+        return None, "bloqueado" if cand.get("finishReason") == "SAFETY" else "error"
+    return texto, "ok"
 
 
 def _contexto(user: dict, resumen: dict) -> str:
@@ -1147,7 +1168,7 @@ async def coach(user: dict = Depends(get_current_user)):
             "No des consejo médico ni de nutrición. No uses emojis. "
             "No saludes ni te despidas.\n\n" + _contexto(user, resumen)
         )
-        texto = await asyncio.to_thread(_pedir_a_gemini, prompt)
+        texto, _motivo = await asyncio.to_thread(_pedir_a_gemini, prompt)
         if texto:
             resumen["ai_text"] = texto
             resumen["ai"] = True
@@ -1169,7 +1190,8 @@ async def coach_ask(body: CoachAsk, user: dict = Depends(get_current_user)):
     resumen = await _resumen_entrenador(user)
     prompt = (
         "Eres un entrenador de gimnasio hablando en español de España, "
-        "directo y breve (máximo 5 frases). Responde a la pregunta usando "
+        "directo y breve (máximo 5 frases). Nada de vocativos tipo "
+        "'campeón' ni exclamaciones. Responde a la pregunta usando "
         "solo los datos reales que te doy.\n"
         "Reglas: no inventes cifras. Si no tienes el dato, dilo. No des "
         "consejo médico ni de nutrición: para eso remite a un profesional. "
@@ -1177,7 +1199,18 @@ async def coach_ask(body: CoachAsk, user: dict = Depends(get_current_user)):
         + _contexto(user, resumen)
         + f"\n\nPregunta: {pregunta}"
     )
-    texto = await asyncio.to_thread(_pedir_a_gemini, prompt)
+    texto, motivo = await asyncio.to_thread(_pedir_a_gemini, prompt)
+    if motivo == "bloqueado":
+        # Casi siempre son preguntas de salud. Se responde con criterio en
+        # vez de con un error tecnico que no ayuda a nadie.
+        return {
+            "answer": (
+                "No puedo ayudarte con eso. Si tienes dolor o una molestia, "
+                "no es cuestión de ajustar la carga: habla con un médico o "
+                "un fisioterapeuta antes de seguir entrenando esa zona."
+            ),
+            "disclaimer": DESCARGO,
+        }
     if not texto:
         raise HTTPException(
             status_code=503, detail="El entrenador no está disponible ahora mismo"
