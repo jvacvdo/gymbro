@@ -3,7 +3,7 @@
 //     del orden de evaluacion de modulos.
 //  2. El frame fijo de 390x844 pasa a ser flexible: ocupa la pantalla en movil
 //     y se centra como maqueta de telefono en escritorio.
-const { useState } = React;
+const { useState, useEffect } = React;
 
 /* El enlace del correo de recuperacion llega como /?reset=TOKEN. Se lee una
    sola vez al arrancar y se limpia de la barra de direcciones, para que el
@@ -26,6 +26,15 @@ export default function App() {
   const [tab, setTab] = useState('inicio');
   const [light, setLight] = useState(false);
   const toggle = () => setLight(v => !v);
+
+  // Si el token deja de valer (caduca, o se rota la clave del servidor) hay
+  // que sacar al usuario a iniciar sesion. Dejarle dentro con un token muerto
+  // le hacia perder el entrenamiento entero al intentar guardarlo.
+  useEffect(() => {
+    const salir = () => { setTab('inicio'); setRoute('login'); };
+    window.addEventListener('gb:sesion-caducada', salir);
+    return () => window.removeEventListener('gb:sesion-caducada', salir);
+  }, []);
 
   const frame = {
     width: 'min(390px, 100vw)',
@@ -57,7 +66,12 @@ export default function App() {
   return wrap(
     <React.Fragment>
       {tab === 'inicio'   && <G.HomeScreen onEntrena={() => setTab('entrena')} light={light} onToggle={toggle} />}
-      {tab === 'entrena'  && <G.EntrenaScreen onFinish={() => setTab('inicio')} />}
+      {/* Entrena se mantiene montada aunque cambies de pestana: al
+          desmontarla se perdia la sesion en curso (los kilos marcados, en que
+          ejercicio ibas). Se oculta, no se destruye. */}
+      <div style={{ position: 'absolute', inset: 0, display: tab === 'entrena' ? 'block' : 'none' }}>
+        <G.EntrenaScreen onFinish={() => setTab('inicio')} />
+      </div>
       {tab === 'gymbro'   && <G.GymBroScreen />}
       {tab === 'progreso' && <G.ProgresoScreen />}
       {tab === 'perfil'   && <G.PerfilScreen light={light} onToggle={toggle} onLogout={() => { setTab('inicio'); setRoute('welcome'); }} />}

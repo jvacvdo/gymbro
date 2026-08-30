@@ -43,6 +43,13 @@ async function request(path, { method = 'GET', body, auth = true, query } = {}) 
   });
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
+    // Token caducado o invalidado (por ejemplo tras rotar el JWT_SECRET).
+    // Dejar al usuario dentro con un token muerto le hace perder el trabajo
+    // al guardar, asi que se le saca a iniciar sesion en cuanto se detecta.
+    if (res.status === 401 && auth) {
+      clearToken();
+      window.dispatchEvent(new CustomEvent('gb:sesion-caducada'));
+    }
     const detail = data && data.detail;
     throw new Error(typeof detail === 'string' ? detail : `HTTP ${res.status}`);
   }

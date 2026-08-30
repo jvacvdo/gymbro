@@ -58,22 +58,23 @@ function SelectStage({picked,setPicked,onStart,intro}){
 
 /* ═══ WorkoutFlow — Stages 2–4 (+ optional Stage 1) ═════ */
 // context: { mode:'athlete'|'gymbro'|'trainer', name, tint:'sage'|'steel' }
-function WorkoutFlow({context={mode:'athlete'},date,onExit}){
+function WorkoutFlow({context={mode:'athlete'},date,resume,onExit}){
   const { BG,CARD,ELEV,OW,SAGE,STEEL,BORDER,BDEF,BSTRONG,TEXT1,TEXT2,TEXT3,UI,DSP,MONO,R,
           Icon,StatusBar,PrimaryBtn,OutlineBtn,Stepper,BottomSheet } = E;
   const tint = context.tint || (context.mode==='trainer'?'steel':'sage');
   const tintC = tint==='steel'?STEEL:SAGE;
   const tintGlow = tint==='steel'?'rgba(138,162,192,0.18)':'rgba(159,216,154,0.18)';
 
-  const [stage,setStage]=useStateE('select');   // select | panel | logger | summary
+  // Con `resume` se entra directo al panel con lo que ya habia registrado.
+  const [stage,setStage]=useStateE(resume?'panel':'select');   // select | panel | logger | summary
   const [picked,setPicked]=useStateE({});
-  const [session,setSession]=useStateE([]);
+  const [session,setSession]=useStateE(resume?resume.muscles:[]);
   const [mi,setMi]=useStateE(0);   // active muscle index
   const [ei,setEi]=useStateE(0);   // active exercise index
 
   /* Id de la sesion en el backend. Se crea al arrancar y se va actualizando,
      asi lo registrado sobrevive a cerrar la app a media sesion. */
-  const [sessionId,setSessionId]=useStateE(null);
+  const [sessionId,setSessionId]=useStateE(resume?resume.id:null);
   const persiste = context.mode!=='trainer';   // la rutina de un cliente aun no se guarda
 
   const build=()=>{
@@ -118,7 +119,7 @@ function WorkoutFlow({context={mode:'athlete'},date,onExit}){
 
   const [saveErr,setSaveErr]=useStateE('');
   const [saving,setSaving]=useStateE(false);
-  const [autoSaved,setAutoSaved]=useStateE(false);
+  const [autoSaved,setAutoSaved]=useStateE(!!resume);
 
   /* Autoguardado. Cada cambio en las series se manda con una pausa corta,
      para no lanzar una peticion por cada toque en los steppers. */
@@ -343,7 +344,24 @@ function EntrenaScreen({onFinish}){
   const [flow,setFlow]=useStateE(false);
   const [selDay,setSelDay]=useStateE(new Date().getDate());
   const [cal,setCal]=useStateE({trained:[],planned:[]});
+  const [pendiente,setPendiente]=useStateE(null);   // sesion a medias del backend
+  const [reanudar,setReanudar]=useStateE(null);     // la que se esta reanudando
   const MES=E.monthKey();
+
+  /* Busca una sesion sin cerrar de hoy. El autoguardado la deja como
+     "planificado", asi que al volver se puede retomar donde se dejo en vez
+     de empezar de cero. */
+  useEffectE(()=>{
+    if(flow) return;
+    let alive=true;
+    E.api.getNextSession().then(n=>{
+      if(!alive) return;
+      const hoy=E.todayISO();
+      const series=n&&(n.muscles||[]).some(m=>(m.exercises||[]).some(e=>(e.series||[]).some(x=>x.done)));
+      setPendiente(n&&n.date===hoy&&series?n:null);
+    }).catch(()=>{});
+    return ()=>{alive=false;};
+  },[flow]);
 
   useEffectE(()=>{
     let alive=true;
@@ -360,7 +378,8 @@ function EntrenaScreen({onFinish}){
   /* El dia elegido en el calendario es el dia con el que se guarda la sesion.
      Antes se seleccionaba un dia y la sesion caia siempre en hoy. */
   const fecha=`${MES}-${String(selDay).padStart(2,'0')}`;
-  if(flow) return <WorkoutFlow context={{mode:'athlete'}} date={fecha} onExit={()=>{setFlow(false);onFinish&&onFinish();}}/>;
+  if(flow) return <WorkoutFlow context={{mode:'athlete'}} date={fecha} resume={reanudar}
+    onExit={()=>{setFlow(false);setReanudar(null);onFinish&&onFinish();}}/>;
   return(
     <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
       <StatusBar/>
@@ -371,8 +390,20 @@ function EntrenaScreen({onFinish}){
           <div style={{fontFamily:DSP,fontWeight:400,fontSize:18,color:TEXT1,marginBottom:14}}>{E.monthLabel()}</div>
           <Calendar trained={cal.trained} planned={cal.planned} selected={selDay} onDay={setSelDay}/>
         </div>
-        <button onClick={()=>setFlow(true)} style={{width:'100%',height:52,background:OW,border:'none',borderRadius:R,fontFamily:UI,fontWeight:500,fontSize:15,color:BG,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,outline:'none'}}>
-          <Icon name="dumbbell" size={16} color={BG}/>Comenzar a entrenar
+        {pendiente&&(
+          <div style={{background:'rgba(159,216,154,0.08)',border:`1px solid rgba(159,216,154,0.28)`,borderRadius:R,padding:'15px 16px',marginBottom:14}}>
+            <div style={{fontFamily:MONO,fontSize:9,color:SAGE,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:7}}>Sesión sin terminar</div>
+            <div style={{fontFamily:UI,fontSize:13.5,color:TEXT2,lineHeight:1.5,marginBottom:13}}>
+              Tienes {(pendiente.muscles||[]).map(m=>m.muscle).join(' y ')} a medias de hoy. Puedes seguir donde lo dejaste.
+            </div>
+            <button onClick={()=>{setReanudar({id:pendiente.id,muscles:pendiente.muscles});setFlow(true);}}
+              style={{width:'100%',height:46,background:SAGE,border:'none',borderRadius:R,fontFamily:UI,fontWeight:500,fontSize:14.5,color:BG,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,outline:'none'}}>
+              <Icon name="chevron-right" size={15} color={BG}/>Retomar sesión
+            </button>
+          </div>
+        )}
+        <button onClick={()=>{setReanudar(null);setFlow(true);}} style={{width:'100%',height:52,background:OW,border:'none',borderRadius:R,fontFamily:UI,fontWeight:500,fontSize:15,color:BG,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,outline:'none'}}>
+          <Icon name="dumbbell" size={16} color={BG}/>{pendiente?'Empezar otra sesión':'Comenzar a entrenar'}
         </button>
       </div>
     </div>

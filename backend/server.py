@@ -565,6 +565,9 @@ async def next_session(user: dict = Depends(get_current_user)):
         break
 
     return {
+        # El id hace falta para poder retomar una sesion a medias en vez de
+        # empezar otra y duplicarla en el calendario.
+        "id": str(s["_id"]),
         "date": s["date"],
         "muscles": muscles,
         "exercise_count": n_ex,

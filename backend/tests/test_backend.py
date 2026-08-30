@@ -490,3 +490,41 @@ def test_videos_apuntan_a_ejercicios_reales(s):
     reales = {e for grupos in tax.values() for ejs in grupos.values() for e in ejs}
     for nombre in videos:
         assert nombre in reales, f"{nombre} no está en la taxonomía"
+
+
+# ── reanudar sesion a medias ──
+def test_next_session_incluye_id_para_retomar(s):
+    h, _ = _mk_user(s, "res")
+    import datetime
+    hoy = datetime.date.today().isoformat()
+    s.post(f"{API}/sessions", headers=h, params={"date": hoy, "status": "planificado"}, json=[{
+        "muscle": "Pecho", "status": "progress",
+        "exercises": [{"name": "Press banca", "done": False,
+                       "series": [{"kg": 60, "reps": 8, "done": True, "by": "ti"}]}],
+    }])
+    n = s.get(f"{API}/sessions/next", headers=h).json()
+    assert n is not None
+    # Sin id no se puede retomar: se crearia otra sesion duplicada
+    assert n.get("id"), n
+    assert n["date"] == hoy
+    # Y debe traer lo ya registrado para poder continuar donde se dejo
+    serie = n["muscles"][0]["exercises"][0]["series"][0]
+    assert serie["done"] is True and serie["kg"] == 60
+
+
+def test_retomar_actualiza_y_no_duplica(s):
+    h, _ = _mk_user(s, "res2")
+    import datetime
+    hoy = datetime.date.today().isoformat()
+    r = s.post(f"{API}/sessions", headers=h, params={"date": hoy, "status": "planificado"}, json=[{
+        "muscle": "Pecho", "status": "progress",
+        "exercises": [{"name": "Press banca", "done": False,
+                       "series": [{"kg": 60, "reps": 8, "done": True, "by": "ti"}]}],
+    }])
+    sid = r.json()["id"]
+    # Cerrarla por PATCH, que es lo que hace la app al retomar y finalizar
+    s.patch(f"{API}/sessions/{sid}", headers=h, json={"status": "entrenado"})
+    mes = hoy[:7]
+    sesiones = s.get(f"{API}/sessions", headers=h, params={"month": mes}).json()
+    assert len(sesiones) == 1, sesiones          # una sola, no dos
+    assert sesiones[0]["status"] == "entrenado"
