@@ -83,6 +83,9 @@ function HomeScreen({onEntrena,light,onToggle}){
           </div>
         </div>
 
+        {/* Entrenador */}
+        <H.CoachCard onEntrena={onEntrena}/>
+
         {/* Próxima sesión */}
         <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:10}}>Tu próxima sesión</div>
         <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:R8(),padding:18,marginBottom:24}}>

@@ -117,6 +117,14 @@ export function updateSession(id, { muscles, status } = {}) {
   return request(`/sessions/${id}`, { method: 'PATCH', body: { muscles, status } });
 }
 
+// ── Entrenador ────────────────────────────────────────
+export function getCoach() {
+  return request('/coach');
+}
+export function askCoach(question) {
+  return request('/coach/ask', { method: 'POST', body: { question } });
+}
+
 // ── Conexiones ────────────────────────────────────────
 export function searchUsers(q) {
   return request('/users/search', { query: { q } });
@@ -153,6 +161,7 @@ export default {
   getStats,
   getTaxonomy,
   getSessions, getNextSession, createSession, updateSession,
+  getCoach, askCoach,
   searchUsers, getConnections, addConnection, respondConnection,
   removeConnection, getConnectionSession,
   getMuscleProgress, getExerciseProgress,

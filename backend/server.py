@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # en vez de fingir que funciona.
     GOOGLE_CLIENT_ID: str = ""
 
+    # Entrenador con IA. Sin clave, /coach sigue funcionando con el motor
+    # de reglas; solo se apaga la parte que redacta en lenguaje natural.
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
     # Envio de correo para recuperar contrasena. Vale cualquier SMTP
     # (Gmail con contrasena de aplicacion, Resend, SendGrid...). Sin
     # SMTP_HOST el envio queda deshabilitado y se avisa por log.
@@ -941,6 +946,243 @@ async def connection_session(conn_id: str, user: dict = Depends(get_current_user
         "status": s["status"],
         "muscles": s.get("muscles", []),
     }
+
+
+# ── Entrenador ───────────────────────────────────────────
+# Dos capas. El motor de reglas calcula sobre los numeros reales del usuario
+# y siempre responde. Gemini solo redacta encima: si no hay clave o falla,
+# el consejo sigue saliendo. Un modelo de lenguaje suelto se inventa las
+# cargas, asi que nunca decide el peso: lo decide la regla.
+
+DESCARGO = (
+    "Estas sugerencias salen de tu propio historial, no de un profesional. "
+    "Si tienes molestias o una condición médica, consulta antes con un "
+    "especialista."
+)
+
+
+def _incremento(grupo: str) -> float:
+    """Salto de carga razonable segun el tren. Las piernas admiten mas."""
+    return 5.0 if grupo == "Tren Inferior" else 2.5
+
+
+async def _grupo_de_musculo(muscle: str) -> str:
+    ex = await db.exercises.find_one({"muscle": muscle})
+    return ex.get("group", "Tren Superior") if ex else "Tren Superior"
+
+
+async def _consejo_ejercicio(user_id, exercise: str) -> Optional[dict]:
+    """Que peso tocaria hoy en un ejercicio, y por que."""
+    rows = await _per_session_stats(user_id, {"exercise_name": exercise})
+    if not rows:
+        return None
+    maxes = [r["max_kg"] for r in rows]
+    ultimo = maxes[-1]
+
+    log = await db.setlogs.find_one(
+        {"user_id": user_id, "exercise_name": exercise, "done": True},
+        sort=[("date", -1), ("kg", -1)],
+    )
+    muscle = log.get("muscle", "") if log else ""
+    paso = _incremento(await _grupo_de_musculo(muscle))
+
+    # Mismo criterio que /progress: sin subida en las ultimas 3 sesiones.
+    estancado = False
+    if len(maxes) >= 4:
+        estancado = max(maxes[-3:]) <= max(maxes[:-3])
+
+    if estancado:
+        return {
+            "exercise": exercise, "muscle": muscle, "last_kg": round(ultimo, 1),
+            "suggested_kg": round(ultimo * 0.9 / 2.5) * 2.5,
+            "state": "estancado",
+            "reason": (
+                f"Llevas 3 sesiones sin superar los {round(ultimo,1)} kg. "
+                f"Baja un 10% esta semana y céntrate en completar todas las "
+                f"repeticiones; la subida suele volver sola."
+            ),
+        }
+    if len(maxes) == 1:
+        return {
+            "exercise": exercise, "muscle": muscle, "last_kg": round(ultimo, 1),
+            "suggested_kg": round(ultimo, 1), "state": "nuevo",
+            "reason": "Solo tienes una sesión con este ejercicio. Repite la misma carga para tener con qué comparar.",
+        }
+    return {
+        "exercise": exercise, "muscle": muscle, "last_kg": round(ultimo, 1),
+        "suggested_kg": round(ultimo + paso, 1), "state": "progresando",
+        "reason": (
+            f"Vienes subiendo: de {round(maxes[0],1)} a {round(ultimo,1)} kg. "
+            f"Prueba {round(ultimo + paso,1)} kg manteniendo las repeticiones."
+        ),
+    }
+
+
+async def _resumen_entrenador(user: dict) -> dict:
+    uid = user["_id"]
+    hoy = date.today()
+
+    # Que musculos se han tocado y cuando
+    ultimo_por_musculo = {}
+    cursor = db.sessions.find({"user_id": uid, "status": "entrenado"}, {"date": 1, "muscles": 1})
+    async for s in cursor:
+        for m in s.get("muscles", []):
+            n = m.get("muscle")
+            if not n:
+                continue
+            d = s["date"]
+            if n not in ultimo_por_musculo or d > ultimo_por_musculo[n]:
+                ultimo_por_musculo[n] = d
+
+    if not ultimo_por_musculo:
+        return {
+            "has_data": False,
+            "headline": "Todavía no hay nada que analizar.",
+            "detail": "Registra tu primera sesión y aquí verás qué peso te toca en cada ejercicio.",
+            "next_muscles": [], "exercises": [], "warnings": [],
+        }
+
+    dias = {n: (hoy - date.fromisoformat(d)).days for n, d in ultimo_por_musculo.items()}
+    descansados = sorted(dias.items(), key=lambda x: -x[1])
+
+    # Proxima sesion: lo que lleva mas tiempo sin tocarse, con 2 dias de margen
+    proximos = [n for n, d in descansados if d >= 2][:2] or [descansados[0][0]]
+
+    # Consejo por ejercicio de esos musculos
+    consejos = []
+    for mus in proximos:
+        nombres = set()
+        async for l in db.setlogs.find({"user_id": uid, "muscle": mus, "done": True}, {"exercise_name": 1}):
+            nombres.add(l["exercise_name"])
+        for nom in sorted(nombres):
+            c = await _consejo_ejercicio(uid, nom)
+            if c:
+                consejos.append(c)
+
+    avisos = []
+    for n, d in descansados:
+        if d >= 14:
+            avisos.append(f"Llevas {d} días sin entrenar {n}.")
+    estancados = [c["exercise"] for c in consejos if c["state"] == "estancado"]
+    if estancados:
+        avisos.append("Estancado en: " + ", ".join(estancados) + ".")
+
+    ultimo_entreno = min(dias.values())
+    if ultimo_entreno == 0:
+        titular = "Ya has entrenado hoy. Buen trabajo."
+    elif ultimo_entreno == 1:
+        titular = "Entrenaste ayer. Hoy toca " + " y ".join(proximos) + "."
+    elif ultimo_entreno >= 7:
+        titular = f"Llevas {ultimo_entreno} días sin entrenar. Vuelve suave."
+    else:
+        titular = "Hoy toca " + " y ".join(proximos) + "."
+
+    return {
+        "has_data": True,
+        "headline": titular,
+        "detail": f"Es lo que llevas más tiempo sin trabajar ({descansados[0][1]} días).",
+        "next_muscles": proximos,
+        "exercises": consejos[:6],
+        "warnings": avisos,
+    }
+
+
+def _pedir_a_gemini(prompt: str) -> Optional[str]:
+    """Llamada sincrona; se invoca desde un hilo. None si falla."""
+    import urllib.request
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+    )
+    cuerpo = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 500},
+    }).encode()
+    req = urllib.request.Request(url, data=cuerpo, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = json.loads(r.read())
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception:
+        logging.exception("Gemini no respondio")
+        return None
+
+
+def _contexto(user: dict, resumen: dict) -> str:
+    lineas = [
+        f"Objetivo: {user.get('goal') or 'sin especificar'}",
+        f"Experiencia: {user.get('experience') or 'sin especificar'}",
+        f"Frecuencia: {user.get('frequency') or 'sin especificar'}",
+        f"Situación: {resumen['headline']}",
+    ]
+    if resumen["exercises"]:
+        lineas.append("Cargas calculadas para hoy (son fijas, no las cambies):")
+        for c in resumen["exercises"]:
+            lineas.append(
+                f"- {c['exercise']}: última {c['last_kg']} kg, "
+                f"toca {c['suggested_kg']} kg ({c['state']})"
+            )
+    if resumen["warnings"]:
+        lineas.append("Avisos: " + " ".join(resumen["warnings"]))
+    return "\n".join(lineas)
+
+
+class CoachAsk(BaseModel):
+    question: str
+
+
+@api.get("/coach")
+async def coach(user: dict = Depends(get_current_user)):
+    """Consejo del dia. Siempre responde, con o sin Gemini."""
+    resumen = await _resumen_entrenador(user)
+    resumen["disclaimer"] = DESCARGO
+    resumen["ai"] = False
+
+    if resumen["has_data"] and settings.GEMINI_API_KEY:
+        prompt = (
+            "Eres un entrenador de gimnasio hablando en español de España, "
+            "directo y sin florituras. Con estos datos reales de la persona, "
+            "escribe 2 o 3 frases sobre qué hacer hoy y por qué.\n"
+            "Reglas: no inventes pesos ni cifras distintas de las dadas. "
+            "No des consejo médico ni de nutrición. No uses emojis. "
+            "No saludes ni te despidas.\n\n" + _contexto(user, resumen)
+        )
+        texto = await asyncio.to_thread(_pedir_a_gemini, prompt)
+        if texto:
+            resumen["ai_text"] = texto
+            resumen["ai"] = True
+    return resumen
+
+
+@api.post("/coach/ask")
+async def coach_ask(body: CoachAsk, user: dict = Depends(get_current_user)):
+    pregunta = body.question.strip()
+    if not pregunta:
+        raise HTTPException(status_code=400, detail="Escribe una pregunta")
+    if len(pregunta) > 400:
+        raise HTTPException(status_code=400, detail="La pregunta es demasiado larga")
+    if not settings.GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=503, detail="El entrenador con IA no está configurado"
+        )
+
+    resumen = await _resumen_entrenador(user)
+    prompt = (
+        "Eres un entrenador de gimnasio hablando en español de España, "
+        "directo y breve (máximo 5 frases). Responde a la pregunta usando "
+        "solo los datos reales que te doy.\n"
+        "Reglas: no inventes cifras. Si no tienes el dato, dilo. No des "
+        "consejo médico ni de nutrición: para eso remite a un profesional. "
+        "No uses emojis.\n\n"
+        + _contexto(user, resumen)
+        + f"\n\nPregunta: {pregunta}"
+    )
+    texto = await asyncio.to_thread(_pedir_a_gemini, prompt)
+    if not texto:
+        raise HTTPException(
+            status_code=503, detail="El entrenador no está disponible ahora mismo"
+        )
+    return {"answer": texto, "disclaimer": DESCARGO}
 
 
 @api.get("/health")

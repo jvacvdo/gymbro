@@ -423,3 +423,48 @@ def test_delete_me_borra_todo(s):
 
 def test_delete_me_requiere_auth(s):
     assert s.delete(f"{API}/me").status_code in (401, 403)
+
+
+# ── entrenador ──
+def test_coach_requiere_auth(s):
+    assert s.get(f"{API}/coach").status_code in (401, 403)
+    assert s.post(f"{API}/coach/ask", json={"question": "hola"}).status_code in (401, 403)
+
+
+def test_coach_cuenta_nueva_no_inventa(s):
+    """Sin historial no debe sugerir cargas."""
+    h, _ = _mk_user(s, "coach")
+    r = s.get(f"{API}/coach", headers=h)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["has_data"] is False
+    assert d["exercises"] == []
+    assert d["disclaimer"]
+
+
+def test_coach_calcula_sobre_datos_reales(s):
+    h, _ = _mk_user(s, "coachd")
+    # Dos sesiones con subida real de carga
+    for dia, kg in (("2026-08-10", 60), ("2026-08-17", 65)):
+        s.post(f"{API}/sessions", headers=h, params={"date": dia, "status": "entrenado"}, json=[{
+            "muscle": "Pecho", "status": "done",
+            "exercises": [{"name": "Press banca", "done": True,
+                           "series": [{"kg": kg, "reps": 8, "done": True, "by": "ti"}]}],
+        }])
+    d = s.get(f"{API}/coach", headers=h).json()
+    assert d["has_data"] is True
+    press = [e for e in d["exercises"] if e["exercise"] == "Press banca"]
+    assert press, d["exercises"]
+    e = press[0]
+    # La sugerencia sale del ultimo peso real, no de un numero inventado
+    assert e["last_kg"] == 65
+    assert e["suggested_kg"] > e["last_kg"]
+    assert e["state"] == "progresando"
+
+
+def test_coach_ask_valida_entrada(s):
+    h, _ = _mk_user(s, "coachq")
+    # Vacia -> 400. Sin clave configurada -> 503. Nunca 500.
+    assert s.post(f"{API}/coach/ask", headers=h, json={"question": "  "}).status_code in (400, 503)
+    assert s.post(f"{API}/coach/ask", headers=h,
+                  json={"question": "x" * 500}).status_code in (400, 503)
