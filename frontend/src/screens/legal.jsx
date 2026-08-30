@@ -1,6 +1,6 @@
 // GymBro — Politica de privacidad.
 //
-// El mismo texto vive en frontend/public/privacidad/index.html, que es la version
+// El mismo texto vive en frontend/public/privacidad.html, que es la version
 // publica que se da como URL a las tiendas de aplicaciones. Si cambias uno,
 // cambia el otro.
 //
