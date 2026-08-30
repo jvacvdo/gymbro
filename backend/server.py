@@ -2,6 +2,13 @@
 import os
 import re
 import json
+import hmac
+import smtplib
+import asyncio
+import logging
+import secrets
+import hashlib
+from email.message import EmailMessage
 from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 from typing import Optional, List
@@ -27,6 +34,22 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_DAYS: int = 30
     CORS_ORIGINS: str = "http://localhost:5173"
+
+    # Acceso con Google. Sin CLIENT_ID el endpoint /auth/google responde 503
+    # en vez de fingir que funciona.
+    GOOGLE_CLIENT_ID: str = ""
+
+    # Envio de correo para recuperar contrasena. Vale cualquier SMTP
+    # (Gmail con contrasena de aplicacion, Resend, SendGrid...). Sin
+    # SMTP_HOST el envio queda deshabilitado y se avisa por log.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "GymBro <no-reply@gymbro.app>"
+    # Base publica de la app, para construir el enlace del correo.
+    APP_URL: str = "http://localhost:5173"
+    RESET_TOKEN_MINUTES: int = 60
 
 
 settings = Settings()
@@ -86,7 +109,12 @@ def create_token(user_id: str) -> str:
 def clean_user(doc: dict) -> dict:
     doc = dict(doc)
     doc["id"] = str(doc.pop("_id"))
-    doc.pop("password_hash", None)
+    # El frontend necesita saber si la cuenta tiene contrasena (para ofrecer
+    # cambiarla) pero nunca el hash.
+    doc["has_password"] = bool(doc.pop("password_hash", None))
+    # Identificador interno de Google: no aporta nada al cliente y es
+    # material de vinculacion de cuentas.
+    doc.pop("google_sub", None)
     return doc
 
 
@@ -189,14 +217,221 @@ async def register(body: RegisterIn):
 @api.post("/auth/login")
 async def login(body: LoginIn):
     user = await db.users.find_one({"email": body.email.lower()})
-    if not user or not verify_password(body.password, user["password_hash"]):
+    # Una cuenta creada con Google no tiene hash: entra por /auth/google.
+    # El mensaje es el generico para no revelar por que via existe la cuenta.
+    if not user or not user.get("password_hash"):
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    if not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     return {"token": create_token(str(user["_id"])), "user": clean_user(user)}
+
+
+# ── Recuperacion de contrasena ───────────────────────────
+class ForgotIn(BaseModel):
+    email: EmailStr
+
+
+class ResetIn(BaseModel):
+    token: str
+    password: str
+
+
+def _hash_token(raw: str) -> str:
+    """El token viaja en el correo; en la base solo guardamos su hash.
+
+    Si alguien lee la coleccion no puede usar los tokens pendientes, igual
+    que con las contrasenas.
+    """
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _send_reset_email(to: str, name: str, link: str) -> None:
+    """Envio sincrono; se llama desde un hilo para no bloquear el event loop."""
+    msg = EmailMessage()
+    msg["Subject"] = "Restablece tu contraseña de GymBro"
+    msg["From"] = settings.SMTP_FROM
+    msg["To"] = to
+    msg.set_content(
+        f"Hola {name}:\n\n"
+        f"Pediste restablecer tu contraseña de GymBro. Abre este enlace:\n\n"
+        f"{link}\n\n"
+        f"El enlace caduca en {settings.RESET_TOKEN_MINUTES} minutos y solo "
+        f"sirve una vez.\n\n"
+        f"Si no lo pediste tú, ignora este correo: tu contraseña no cambia.\n"
+    )
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as s:
+        s.starttls()
+        if settings.SMTP_USER:
+            s.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        s.send_message(msg)
+
+
+@api.post("/auth/forgot-password")
+async def forgot_password(body: ForgotIn):
+    """Siempre responde igual, exista el email o no.
+
+    Contestar "ese correo no existe" convierte el endpoint en un detector de
+    quien tiene cuenta. La respuesta es identica en ambos casos.
+    """
+    generic = {"sent": True}
+    user = await db.users.find_one({"email": body.email.lower()})
+    if not user or not user.get("password_hash"):
+        # Sin password_hash es una cuenta de Google: no hay contrasena que
+        # restablecer, pero tampoco lo revelamos.
+        return generic
+
+    raw = secrets.token_urlsafe(32)
+    await db.password_resets.insert_one(
+        {
+            "user_id": user["_id"],
+            "token_hash": _hash_token(raw),
+            "expires_at": datetime.now(timezone.utc)
+            + timedelta(minutes=settings.RESET_TOKEN_MINUTES),
+            "used": False,
+        }
+    )
+
+    link = f"{settings.APP_URL.rstrip('/')}/?reset={raw}"
+    if not settings.SMTP_HOST:
+        logging.warning(
+            "SMTP sin configurar: no se envio el correo de recuperacion a %s. "
+            "Enlace generado: %s", body.email, link
+        )
+        return generic
+    try:
+        await asyncio.to_thread(
+            _send_reset_email, user["email"], user.get("name", ""), link
+        )
+    except Exception:
+        # Un fallo del proveedor no debe delatar si la cuenta existe.
+        logging.exception("Fallo enviando el correo de recuperacion")
+    return generic
+
+
+@api.post("/auth/reset-password")
+async def reset_password(body: ResetIn):
+    if len(body.password) < 8:
+        raise HTTPException(
+            status_code=400, detail="La contraseña debe tener al menos 8 caracteres"
+        )
+    rec = await db.password_resets.find_one(
+        {
+            "token_hash": _hash_token(body.token),
+            "used": False,
+            "expires_at": {"$gt": datetime.now(timezone.utc)},
+        }
+    )
+    if not rec:
+        raise HTTPException(status_code=400, detail="El enlace no es válido o ya caducó")
+
+    await db.users.update_one(
+        {"_id": rec["user_id"]},
+        {"$set": {"password_hash": hash_password(body.password)}},
+    )
+    await db.password_resets.update_one({"_id": rec["_id"]}, {"$set": {"used": True}})
+    # Cualquier otro enlace pendiente deja de servir.
+    await db.password_resets.update_many(
+        {"user_id": rec["user_id"], "used": False}, {"$set": {"used": True}}
+    )
+
+    user = await db.users.find_one({"_id": rec["user_id"]})
+    return {"token": create_token(str(user["_id"])), "user": clean_user(user)}
+
+
+# ── Acceso con Google ────────────────────────────────────
+class GoogleIn(BaseModel):
+    credential: str
+
+
+async def _unique_username(base: str) -> str:
+    """Deriva un usuario libre a partir del correo de Google."""
+    base = re.sub(r"[^a-z0-9_]", "", base.lower()) or "atleta"
+    base = base[:20]
+    if not await db.users.find_one({"username": base}):
+        return base
+    for _ in range(50):
+        cand = f"{base}{secrets.randbelow(9000) + 1000}"
+        if not await db.users.find_one({"username": cand}):
+            return cand
+    return f"{base}{secrets.token_hex(4)}"
+
+
+@api.post("/auth/google")
+async def google_auth(body: GoogleIn):
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=503, detail="El acceso con Google no está configurado"
+        )
+    # Import perezoso: sin GOOGLE_CLIENT_ID la libreria no hace falta.
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+
+    try:
+        info = await asyncio.to_thread(
+            google_id_token.verify_oauth2_token,
+            body.credential,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID,
+        )
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token de Google no válido")
+
+    if not info.get("email_verified"):
+        raise HTTPException(status_code=401, detail="Tu correo de Google no está verificado")
+
+    email = info["email"].lower()
+    user = await db.users.find_one({"email": email})
+    if user:
+        # Cuenta ya existente: se vincula con Google y se entra.
+        if not user.get("google_sub"):
+            await db.users.update_one(
+                {"_id": user["_id"]}, {"$set": {"google_sub": info["sub"]}}
+            )
+        needs_onboarding = not user.get("goal")
+        return {
+            "token": create_token(str(user["_id"])),
+            "user": clean_user(user),
+            "needs_onboarding": needs_onboarding,
+        }
+
+    # Cuenta nueva. Google da nombre y correo, pero no objetivo ni
+    # experiencia: eso se pregunta despues en el onboarding.
+    doc = {
+        "email": email,
+        "username": await _unique_username(email.split("@")[0]),
+        "password_hash": None,
+        "google_sub": info["sub"],
+        "name": info.get("name") or email.split("@")[0],
+        "created_at": now_iso(),
+        "weight": None, "height": None, "age": None, "sex": None,
+        "goal": "", "experience": "", "frequency": "",
+    }
+    res = await db.users.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    return {
+        "token": create_token(str(res.inserted_id)),
+        "user": clean_user(doc),
+        "needs_onboarding": True,
+    }
 
 
 @api.get("/me")
 async def get_me(user: dict = Depends(get_current_user)):
     return clean_user(user)
+
+
+@api.delete("/me")
+async def delete_me(user: dict = Depends(get_current_user)):
+    """Borra la cuenta y todo lo que cuelga de ella. No hay vuelta atras."""
+    uid = user["_id"]
+    await db.sessions.delete_many({"user_id": uid})
+    await db.setlogs.delete_many({"user_id": uid})
+    await db.connections.delete_many(
+        {"$or": [{"a_user_id": uid}, {"b_user_id": uid}]}
+    )
+    await db.password_resets.delete_many({"user_id": uid})
+    await db.users.delete_one({"_id": uid})
+    return {"deleted": True}
 
 
 @api.patch("/me")
@@ -871,6 +1106,9 @@ async def startup():
     await db.setlogs.create_index([("user_id", 1), ("muscle", 1)])
     await db.connections.create_index([("a_user_id", 1), ("b_user_id", 1)])
     await db.connections.create_index("b_user_id")
+    await db.password_resets.create_index("token_hash")
+    # Mongo borra solo los tokens caducados: no acumulamos enlaces vivos.
+    await db.password_resets.create_index("expires_at", expireAfterSeconds=0)
     await seed_exercises()
     await seed_demo()
 

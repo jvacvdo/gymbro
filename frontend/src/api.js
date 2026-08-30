@@ -10,6 +10,10 @@ const RAW = import.meta.env.VITE_API_URL;
 const BASE = RAW === undefined ? 'http://localhost:8001' : RAW;
 const TOKEN_KEY = 'gb_token';
 
+// Client ID publico de Google. Si esta vacio, la app oculta el boton en vez
+// de mostrar uno que no puede funcionar.
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -59,6 +63,19 @@ export async function login(email, password) {
 export function logout() {
   clearToken();
 }
+export async function googleAuth(credential) {
+  const data = await request('/auth/google', { method: 'POST', body: { credential }, auth: false });
+  if (data && data.token) setToken(data.token);
+  return data;
+}
+export function forgotPassword(email) {
+  return request('/auth/forgot-password', { method: 'POST', body: { email }, auth: false });
+}
+export async function resetPassword(token, password) {
+  const data = await request('/auth/reset-password', { method: 'POST', body: { token, password }, auth: false });
+  if (data && data.token) setToken(data.token);
+  return data;
+}
 
 // ── Profile ───────────────────────────────────────────
 export function getMe() {
@@ -66,6 +83,11 @@ export function getMe() {
 }
 export function updateMe(patch) {
   return request('/me', { method: 'PATCH', body: patch });
+}
+export async function deleteMe() {
+  const data = await request('/me', { method: 'DELETE' });
+  clearToken();
+  return data;
 }
 
 // ── Stats ─────────────────────────────────────────────
@@ -124,9 +146,10 @@ export function getExerciseProgress(exercise) {
 }
 
 export default {
+  GOOGLE_CLIENT_ID,
   getToken, setToken, clearToken,
-  register, login, logout,
-  getMe, updateMe,
+  register, login, logout, googleAuth, forgotPassword, resetPassword,
+  getMe, updateMe, deleteMe,
   getStats,
   getTaxonomy,
   getSessions, getNextSession, createSession, updateSession,

@@ -9,6 +9,7 @@ function PerfilScreen({light,onToggle,onLogout}){
   const [me,setMe]=useStatePF(null);
   const [stats,setStats]=useStatePF(null);
   const [edit,setEdit]=useStatePF(false);
+  const [borrar,setBorrar]=useStatePF(false);
   const [aviso,setAviso]=useStatePF('');
 
   useEffectPF(()=>{
@@ -154,10 +155,61 @@ function PerfilScreen({light,onToggle,onLogout}){
           <Icon name="lock" size={17} color={TEXT3}/>
         </button>
         <div style={{fontFamily:UI,fontSize:12,color:TEXT3,marginTop:8,paddingLeft:2}}>Gestiona a las personas que entrenas. Próximamente.</div>
+
+        {/* Zona de peligro. Separada del resto a proposito. */}
+        <div style={{marginTop:32,paddingTop:20,borderTop:`1px solid ${BORDER}`}}>
+          <button onClick={()=>setBorrar(true)} style={{background:'none',border:'none',cursor:'pointer',padding:0,outline:'none',fontFamily:UI,fontSize:13,color:'#FF6B6B'}}>
+            Borrar mi cuenta
+          </button>
+          <div style={{fontFamily:UI,fontSize:11.5,color:TEXT3,marginTop:6,lineHeight:1.5}}>
+            Se borran tus entrenamientos, tu progreso y tus compañeros. No se puede deshacer.
+          </div>
+        </div>
       </div>
 
       <EditProfileSheet open={edit} me={me} onClose={()=>setEdit(false)} onSaved={u=>{setMe(u);setEdit(false);}}/>
+      <DeleteAccountSheet open={borrar} me={me} onClose={()=>setBorrar(false)} onDeleted={()=>onLogout&&onLogout()}/>
     </div>
+  );
+}
+
+/* ── Borrar cuenta ───────────────────────────────────── */
+function DeleteAccountSheet({open,me,onClose,onDeleted}){
+  const { TEXT1,TEXT2,TEXT3,UI,MONO,BottomSheet,Field,OutlineBtn,R,BG } = PF;
+  const [txt,setTxt]=useStatePF('');
+  const [busy,setBusy]=useStatePF(false);
+  const [err,setErr]=useStatePF('');
+  /* Se pide escribir el propio usuario: un boton de "si, borrar" se pulsa
+     sin leer, y esto no tiene deshacer. */
+  const clave=me&&me.username?me.username:'';
+  const puede=txt.trim()===clave&&clave!=='';
+
+  useEffectPF(()=>{ if(open){ setTxt(''); setErr(''); } },[open]);
+
+  const borrar=async()=>{
+    if(busy||!puede) return;
+    setBusy(true); setErr('');
+    try{ await PF.api.deleteMe(); onDeleted(); }
+    catch(e){ setErr(e.message||'No se pudo borrar la cuenta'); setBusy(false); }
+  };
+
+  return(
+    <BottomSheet open={open} onClose={onClose} title="Borrar mi cuenta">
+      <div style={{fontFamily:UI,fontSize:13.5,color:TEXT2,lineHeight:1.55,marginBottom:14}}>
+        Esto borra para siempre tu cuenta, todos tus entrenamientos, tus series
+        registradas y tus conexiones con otros usuarios. <span style={{color:TEXT1}}>No hay forma de recuperarlo.</span>
+      </div>
+      <div style={{fontFamily:UI,fontSize:13.5,color:TEXT2,marginBottom:10}}>
+        Para confirmar, escribe tu usuario: <span style={{fontFamily:MONO,fontSize:12.5,color:TEXT1}}>{clave}</span>
+      </div>
+      <Field label="Tu usuario" prefix="@" placeholder={clave} value={txt} onChange={e=>setTxt(e.target.value)}/>
+      {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginBottom:10}}>{err}</div>}
+      <button onClick={borrar} disabled={!puede||busy}
+        style={{width:'100%',height:52,borderRadius:R,background:puede?'#FF6B6B':'var(--gb-input)',border:'none',cursor:puede?'pointer':'default',fontFamily:UI,fontWeight:500,fontSize:15,color:puede?BG:TEXT3,outline:'none',marginBottom:10}}>
+        {busy?'Borrando…':'Borrar mi cuenta para siempre'}
+      </button>
+      <OutlineBtn onClick={onClose}>Cancelar</OutlineBtn>
+    </BottomSheet>
   );
 }
 

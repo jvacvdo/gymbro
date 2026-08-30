@@ -31,10 +31,156 @@ function GoogleG({size=18}){
     <svg width={size} height={size} viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
   );
 }
+/* Carga el script de Google una sola vez, aunque lo pidan varias pantallas. */
+let gsiPromise=null;
+function loadGsi(){
+  if(gsiPromise) return gsiPromise;
+  gsiPromise=new Promise((ok,fail)=>{
+    if(window.google&&window.google.accounts){ ok(); return; }
+    const s=document.createElement('script');
+    s.src='https://accounts.google.com/gsi/client';
+    s.async=true; s.defer=true;
+    s.onload=()=>ok(); s.onerror=()=>fail(new Error('No se pudo cargar Google'));
+    document.head.appendChild(s);
+  });
+  return gsiPromise;
+}
+
+/* Boton de Google.
+   Google no deja disparar su flujo desde un boton propio, asi que se renderiza
+   el suyo real, invisible y encima del nuestro. El usuario ve el diseno de
+   GymBro y pulsa el de Google. */
+function GoogleButton({label,onDone,onError}){
+  const { CARD,BDEF,TEXT1,UI,R } = window.GB;
+  const box=React.useRef(null);
+  const [ready,setReady]=useStateA(false);
+  const clientId=window.GB.api.GOOGLE_CLIENT_ID;
+
+  React.useEffect(()=>{
+    if(!clientId) return;
+    let alive=true;
+    loadGsi().then(()=>{
+      if(!alive||!box.current) return;
+      window.google.accounts.id.initialize({
+        client_id:clientId,
+        callback:async(resp)=>{
+          try{
+            const r=await window.GB.api.googleAuth(resp.credential);
+            onDone(r);
+          }catch(e){ onError(e.message||'No se pudo entrar con Google'); }
+        },
+      });
+      box.current.innerHTML='';
+      window.google.accounts.id.renderButton(box.current,{
+        type:'standard',theme:'outline',size:'large',width:320,
+      });
+      setReady(true);
+    }).catch(()=>onError('No se pudo cargar Google'));
+    return ()=>{alive=false;};
+  },[clientId]);
+
+  // Sin client_id configurado no se muestra nada: un boton que no puede
+  // funcionar es peor que ninguno.
+  if(!clientId) return null;
+
+  return(
+    <div style={{position:'relative',width:'100%',height:52}}>
+      <div style={{width:'100%',height:52,background:CARD,border:`1px solid ${BDEF}`,borderRadius:R,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+        <span style={{position:'absolute',left:18,display:'flex'}}><GoogleG size={19}/></span>
+        <span style={{fontFamily:UI,fontWeight:500,fontSize:15,color:TEXT1}}>{label}</span>
+      </div>
+      <div ref={box} style={{position:'absolute',inset:0,opacity:0,overflow:'hidden',cursor:'pointer',display:ready?'block':'none'}}></div>
+    </div>
+  );
+}
+
+/* ── Recuperar contrasena ────────────────────────────── */
+function ForgotSheet({open,onClose}){
+  const { UI,TEXT2,BottomSheet,Field,PrimaryBtn,OutlineBtn } = window.GB;
+  const [email,setEmail]=useStateA('');
+  const [busy,setBusy]=useStateA(false);
+  const [sent,setSent]=useStateA(false);
+  const [err,setErr]=useStateA('');
+
+  const enviar=async()=>{
+    if(busy) return;
+    setBusy(true); setErr('');
+    try{ await window.GB.api.forgotPassword(email); setSent(true); }
+    catch(e){ setErr(e.message||'No se pudo enviar'); }
+    finally{ setBusy(false); }
+  };
+  const cerrar=()=>{ setSent(false); setEmail(''); setErr(''); onClose(); };
+
+  return(
+    <BottomSheet open={open} onClose={cerrar} title={sent?'Revisa tu correo':'Recuperar contraseña'}>
+      {sent? (
+        <>
+          <div style={{fontFamily:UI,fontSize:13.5,color:TEXT2,lineHeight:1.5,marginBottom:18}}>
+            Si hay una cuenta con ese correo, te hemos enviado un enlace para
+            crear una contraseña nueva. Caduca en una hora.
+          </div>
+          <PrimaryBtn onClick={cerrar} icon="check">Entendido</PrimaryBtn>
+        </>
+      ):(
+        <>
+          <div style={{fontFamily:UI,fontSize:13.5,color:TEXT2,lineHeight:1.5,marginBottom:16}}>
+            Escribe tu correo y te mandamos un enlace para restablecerla.
+          </div>
+          <Field label="Email" type="email" placeholder="alex@correo.com" value={email} onChange={e=>setEmail(e.target.value)}/>
+          {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginBottom:10}}>{err}</div>}
+          <div style={{marginBottom:10}}>
+            <PrimaryBtn onClick={enviar} disabled={busy||!email.trim()}>{busy?'Enviando…':'Enviar enlace'}</PrimaryBtn>
+          </div>
+          <OutlineBtn onClick={cerrar}>Cancelar</OutlineBtn>
+        </>
+      )}
+    </BottomSheet>
+  );
+}
+
+/* Pantalla a la que llega el enlace del correo (?reset=TOKEN). */
+function ResetPasswordScreen({token,onDone,onCancel}){
+  const [f,setF]=useStateA({a:'',b:''});
+  const [busy,setBusy]=useStateA(false);
+  const [err,setErr]=useStateA('');
+  const corta=f.a.length>0&&f.a.length<8;
+  const distintas=f.b.length>0&&f.a!==f.b;
+
+  const guardar=async()=>{
+    if(busy) return;
+    setBusy(true); setErr('');
+    try{ await window.GB.api.resetPassword(token,f.a); onDone(); }
+    catch(e){ setErr(e.message||'No se pudo cambiar la contraseña'); setBusy(false); }
+  };
+
+  return(
+    <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
+      <StatusBar/>
+      <div style={{flex:1,overflowY:'auto',padding:'0 24px 24px'}}>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:26}}><Logo size={20}/></div>
+        <div style={{fontFamily:DSP,fontWeight:700,fontSize:30,color:TEXT1,letterSpacing:'-0.02em',marginBottom:8}}>Nueva contraseña</div>
+        <div style={{fontFamily:UI,fontSize:13.5,color:TEXT2,lineHeight:1.5,marginBottom:22}}>Elige una contraseña nueva para tu cuenta. Mínimo 8 caracteres.</div>
+        <Field label="Contraseña" type="password" placeholder="••••••••" value={f.a} onChange={e=>setF(s=>({...s,a:e.target.value}))}/>
+        <Field label="Repite la contraseña" type="password" placeholder="••••••••" value={f.b} onChange={e=>setF(s=>({...s,b:e.target.value}))}/>
+        {corta&&<div style={{fontFamily:UI,fontSize:12.5,color:TEXT3,marginBottom:8}}>Te faltan {8-f.a.length} caracteres.</div>}
+        {distintas&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginBottom:8}}>Las dos contraseñas no coinciden.</div>}
+        {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginBottom:8}}>{err}</div>}
+        <div style={{marginTop:10}}>
+          <PrimaryBtn onClick={guardar} disabled={busy||f.a.length<8||f.a!==f.b} icon="check">{busy?'Guardando…':'Cambiar contraseña'}</PrimaryBtn>
+        </div>
+        <div style={{textAlign:'center',marginTop:16}}>
+          <GhostLink onClick={onCancel}>Volver al inicio</GhostLink>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoginScreen({onBack,onDone,onToRegister}){
   const [f,setF]=useStateA({email:'',pass:''});
   const [err,setErr]=useStateA('');
   const [busy,setBusy]=useStateA(false);
+  const [forgot,setForgot]=useStateA(false);
   const set=k=>e=>setF(v=>({...v,[k]:e.target.value}));
   const submit=async()=>{
     if(busy) return;
@@ -57,30 +203,28 @@ function LoginScreen({onBack,onDone,onToRegister}){
         {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginTop:4}}>{err}</div>}
         <div style={{marginTop:10}}><PrimaryBtn onClick={submit} disabled={busy}>{busy?'Entrando…':'Iniciar sesión'}</PrimaryBtn></div>
         <div style={{textAlign:'center',marginTop:10,marginBottom:18}}>
-          <GhostLink onClick={()=>{}}>¿Olvidaste tu contraseña?</GhostLink>
+          <GhostLink onClick={()=>setForgot(true)}>¿Olvidaste tu contraseña?</GhostLink>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}>
           <div style={{flex:1,height:1,background:BORDER}}></div>
           <span style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>o continúa con</span>
           <div style={{flex:1,height:1,background:BORDER}}></div>
         </div>
-        <button onClick={()=>setErr('El acceso con Google todavía no está conectado.')} style={{width:'100%',height:52,background:CARD,border:`1px solid ${BDEF}`,borderRadius:R,cursor:'pointer',outline:'none',position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
-          <span style={{position:'absolute',left:18,display:'flex'}}><GoogleG size={19}/></span>
-          <span style={{fontFamily:UI,fontWeight:500,fontSize:15,color:TEXT1}}>Iniciar sesión con Google</span>
-        </button>
+        <GoogleButton label="Iniciar sesión con Google" onDone={r=>onDone(r)} onError={setErr}/>
         <div style={{textAlign:'center',marginTop:18}}>
           <GhostLink onClick={onToRegister}>¿No tienes cuenta? <span style={{color:TEXT1}}>Regístrate</span></GhostLink>
         </div>
       </div>
+      <ForgotSheet open={forgot} onClose={()=>setForgot(false)}/>
     </div>
   );
 }
 
 /* ── Register — 3 steps ──────────────────────────────── */
-function StepDots({step}){
+function StepDots({step,total=3}){
   return(
     <div style={{display:'flex',gap:7,justifyContent:'center',marginBottom:22}}>
-      {[0,1,2].map(i=><span key={i} style={{width:i===step?22:7,height:7,borderRadius:999,background:i===step?OW:BSTRONG,transition:'all 220ms ease'}}></span>)}
+      {Array.from({length:total},(_,i)=>i).map(i=><span key={i} style={{width:i===step?22:7,height:7,borderRadius:999,background:i===step?OW:BSTRONG,transition:'all 220ms ease'}}></span>)}
     </div>
   );
 }
@@ -103,7 +247,9 @@ function SexToggle({value,onChange}){
   );
 }
 
-function RegisterScreen({onBack,onDone,onToLogin}){
+/* onboardingOnly: quien entra con Google ya tiene cuenta, pero no objetivo ni
+   experiencia. Se le piden los dos primeros pasos y se guardan con PATCH /me. */
+function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
   const [step,setStep]=useStateA(0);
   const [q,setQ]=useStateA({goal:'',exp:'',freq:''});
   const [m,setM]=useStateA({weight:'',height:'',age:'',sex:'Prefiero no decir'});
@@ -114,6 +260,24 @@ function RegisterScreen({onBack,onDone,onToLogin}){
   const back=()=>step===0?onBack():setStep(step-1);
   const [err,setErr]=useStateA('');
   const [busy,setBusy]=useStateA(false);
+  /* Cierra el onboarding de una cuenta de Google: los datos ya existentes
+     se completan, no se crea nada. */
+  const guardarOnboarding=async()=>{
+    if(busy) return;
+    setErr(''); setBusy(true);
+    try{
+      await window.GB.api.updateMe({
+        goal:q.goal, experience:q.exp, frequency:q.freq,
+        weight:m.weight?Number(m.weight):null,
+        height:m.height?Number(m.height):null,
+        age:m.age?Number(m.age):null,
+        sex:m.sex,
+      });
+      onDone();
+    }catch(e){ setErr(e.message||'No se pudo guardar tu perfil'); }
+    finally{ setBusy(false); }
+  };
+
   const submit=async()=>{
     if(busy) return;
     setErr(''); setBusy(true);
@@ -148,7 +312,7 @@ function RegisterScreen({onBack,onDone,onToLogin}){
         <div style={{display:'flex',alignItems:'center',marginBottom:18}}>
           <button onClick={back} style={{background:'none',border:'none',cursor:'pointer',padding:0,outline:'none',display:'flex'}}><Icon name="back" size={20} color={TEXT2}/></button>
         </div>
-        <StepDots step={step}/>
+        <StepDots step={step} total={onboardingOnly?2:3}/>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'0 24px 28px'}}>
         {step===0&&(
@@ -171,8 +335,18 @@ function RegisterScreen({onBack,onDone,onToLogin}){
             <Field label="Edad" optional type="number" placeholder="0" suffix="AÑOS" value={m.age} onChange={setMk('age')}/>
             <div style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.14em',textTransform:'uppercase',margin:'4px 0 9px'}}>Sexo · opcional</div>
             <SexToggle value={m.sex} onChange={v=>setM(s=>({...s,sex:v}))}/>
-            <div style={{textAlign:'center',margin:'16px 0 4px'}}><GhostLink onClick={()=>setStep(2)}>Completar después →</GhostLink></div>
-            <PrimaryBtn onClick={()=>setStep(2)} icon="chevron-right">Continuar</PrimaryBtn>
+            {onboardingOnly? (
+              <>
+                {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',margin:'12px 0 8px'}}>{err}</div>}
+                <div style={{textAlign:'center',margin:'16px 0 4px'}}><GhostLink onClick={guardarOnboarding}>Completar después →</GhostLink></div>
+                <PrimaryBtn onClick={guardarOnboarding} disabled={busy} icon="check">{busy?'Guardando…':'Empezar a entrenar'}</PrimaryBtn>
+              </>
+            ):(
+              <>
+                <div style={{textAlign:'center',margin:'16px 0 4px'}}><GhostLink onClick={()=>setStep(2)}>Completar después →</GhostLink></div>
+                <PrimaryBtn onClick={()=>setStep(2)} icon="chevron-right">Continuar</PrimaryBtn>
+              </>
+            )}
           </>
         )}
         {step===2&&(
@@ -192,6 +366,12 @@ function RegisterScreen({onBack,onDone,onToLogin}){
             </div>
             {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginBottom:8}}>{err}</div>}
             <PrimaryBtn onClick={submit} disabled={busy||a.pass!==a.pass2}>{busy?'Creando…':'Crear cuenta'}</PrimaryBtn>
+            <div style={{display:'flex',alignItems:'center',gap:12,margin:'18px 0'}}>
+              <div style={{flex:1,height:1,background:BORDER}}></div>
+              <span style={{fontFamily:MONO,fontSize:10,color:TEXT3,letterSpacing:'0.1em',textTransform:'uppercase'}}>o regístrate con</span>
+              <div style={{flex:1,height:1,background:BORDER}}></div>
+            </div>
+            <GoogleButton label="Continuar con Google" onDone={r=>onDone(r)} onError={setErr}/>
             <div style={{textAlign:'center',marginTop:14}}>
               <GhostLink onClick={onToLogin}>¿Ya tienes cuenta? <span style={{color:TEXT1}}>Inicia sesión</span></GhostLink>
             </div>
@@ -202,4 +382,4 @@ function RegisterScreen({onBack,onDone,onToLogin}){
   );
 }
 
-Object.assign(window.GB,{ WelcomeScreen, LoginScreen, RegisterScreen });
+Object.assign(window.GB,{ WelcomeScreen, LoginScreen, RegisterScreen, ResetPasswordScreen });

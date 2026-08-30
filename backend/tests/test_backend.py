@@ -368,3 +368,58 @@ def test_connection_unknown_user(s):
 def test_connections_require_auth(s):
     assert s.get(f"{API}/connections").status_code in (401, 403)
     assert s.get(f"{API}/users/search", params={"q": "ab"}).status_code in (401, 403)
+
+
+# ── recuperacion de contrasena ──
+def test_forgot_password_no_revela_si_existe(s):
+    """La respuesta debe ser identica exista o no la cuenta."""
+    h, user = _mk_user(s, "fp")
+    email = f"{user}@example.com"
+    r1 = s.post(f"{API}/auth/forgot-password", json={"email": email})
+    r2 = s.post(f"{API}/auth/forgot-password", json={"email": "no_existe_jamas@example.com"})
+    assert r1.status_code == r2.status_code == 200
+    assert r1.json() == r2.json()
+
+
+def test_reset_password_token_invalido(s):
+    r = s.post(f"{API}/auth/reset-password",
+               json={"token": "inventado" * 4, "password": "nuevapass123"})
+    assert r.status_code == 400
+
+
+def test_reset_password_exige_longitud(s):
+    r = s.post(f"{API}/auth/reset-password", json={"token": "x" * 20, "password": "corta"})
+    assert r.status_code == 400
+    assert "8" in r.json()["detail"]
+
+
+# ── acceso con Google ──
+def test_google_rechaza_credencial_falsa(s):
+    r = s.post(f"{API}/auth/google", json={"credential": "esto.no.es.un.token"})
+    # 401 si esta configurado, 503 si no hay CLIENT_ID. Nunca 200.
+    assert r.status_code in (401, 503)
+
+
+# ── borrado de cuenta ──
+def test_delete_me_borra_todo(s):
+    h, user = _mk_user(s, "del")
+    email = f"{user}@example.com"
+
+    # Deja rastro: una sesion con series.
+    s.post(f"{API}/sessions", headers=h, params={"status": "entrenado"}, json=[{
+        "muscle": "Pecho", "status": "done",
+        "exercises": [{"name": "Press banca", "done": True,
+                       "series": [{"kg": 60, "reps": 8, "done": True, "by": "ti"}]}],
+    }])
+    assert s.get(f"{API}/stats", headers=h).json()["sessions"] == 1
+
+    assert s.delete(f"{API}/me", headers=h).status_code == 200
+
+    # El token ya no vale y la cuenta no puede volver a entrar.
+    assert s.get(f"{API}/me", headers=h).status_code == 401
+    assert s.post(f"{API}/auth/login",
+                  json={"email": email, "password": "test1234"}).status_code == 401
+
+
+def test_delete_me_requiere_auth(s):
+    assert s.delete(f"{API}/me").status_code in (401, 403)
