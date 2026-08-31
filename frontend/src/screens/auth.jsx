@@ -236,11 +236,17 @@ function StepDots({step,total=3}){
     </div>
   );
 }
-function ChoiceCard({label,selected,onClick}){
+function ChoiceCard({label,selected,onClick,multi}){
   return(
     <button onClick={onClick} style={{width:'100%',textAlign:'left',background:selected?'var(--gb-elev)':CARD,border:`${selected?2:1}px solid ${selected?TEXT1:BDEF}`,borderRadius:R,padding:selected?'14px 15px':'15px 16px',marginBottom:9,cursor:'pointer',outline:'none',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
       <span style={{fontFamily:UI,fontSize:14.5,fontWeight:selected?500:400,color:selected?TEXT1:TEXT2}}>{label}</span>
-      {selected&&<Icon name="check" size={17} color={SAGE} sw={2.4}/>}
+      {/* En multiopcion se dibuja casilla: una marca suelta no dice que se
+          puedan acumular respuestas. */}
+      {multi
+        ? <span style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`1.5px solid ${selected?SAGE:BDEF}`,background:selected?SAGE:'transparent',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            {selected&&<Icon name="check" size={13} color={BG} sw={3}/>}
+          </span>
+        : selected&&<Icon name="check" size={17} color={SAGE} sw={2.4}/>}
     </button>
   );
 }
@@ -259,7 +265,10 @@ function SexToggle({value,onChange}){
    experiencia. Se le piden los dos primeros pasos y se guardan con PATCH /me. */
 function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
   const [step,setStep]=useStateA(0);
-  const [q,setQ]=useStateA({goal:'',exp:'',freq:''});
+  // El objetivo admite varias respuestas; experiencia y frecuencia no, que
+  // por definicion son una sola.
+  const [q,setQ]=useStateA({goal:[],exp:'',freq:''});
+  const toggleGoal=g=>setQ(s=>({...s,goal:s.goal.includes(g)?s.goal.filter(x=>x!==g):[...s.goal,g]}));
   const [m,setM]=useStateA({weight:'',height:'',age:'',sex:'Prefiero no decir'});
   const [a,setA]=useStateA({name:'',user:'',email:'',pass:'',pass2:''});
   const setQk=k=>v=>setQ(s=>({...s,[k]:v}));
@@ -276,7 +285,7 @@ function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
     setErr(''); setBusy(true);
     try{
       await window.GB.api.updateMe({
-        goal:q.goal, experience:q.exp, frequency:q.freq,
+        goal:q.goal.join(', '), experience:q.exp, frequency:q.freq,
         weight:m.weight?Number(m.weight):null,
         height:m.height?Number(m.height):null,
         age:m.age?Number(m.age):null,
@@ -293,7 +302,7 @@ function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
     try{
       await window.GB.api.register({
         name:a.name, username:a.user, email:a.email, password:a.pass,
-        goal:q.goal, experience:q.exp, frequency:q.freq,
+        goal:q.goal.join(', '), experience:q.exp, frequency:q.freq,
         weight:m.weight?Number(m.weight):null,
         height:m.height?Number(m.height):null,
         age:m.age?Number(m.age):null,
@@ -329,8 +338,8 @@ function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
         {step===0&&(
           <>
             <Head t="¿Qué te trae al gym?" s="Esto nos ayuda a entender tu progreso."/>
-            <QLabel>¿Cuál es tu objetivo principal?</QLabel>
-            {GOALS.map(g=><ChoiceCard key={g} label={g} selected={q.goal===g} onClick={()=>setQk('goal')(g)}/>)}
+            <QLabel>¿Cuál es tu objetivo? <span style={{fontFamily:UI,fontSize:12,color:TEXT3,fontWeight:400}}>· puedes elegir varios</span></QLabel>
+            {GOALS.map(g=><ChoiceCard key={g} label={g} multi selected={q.goal.includes(g)} onClick={()=>toggleGoal(g)}/>)}
             <QLabel>¿Cuánto tiempo llevas entrenando?</QLabel>
             {EXP.map(g=><ChoiceCard key={g} label={g} selected={q.exp===g} onClick={()=>setQk('exp')(g)}/>)}
             <QLabel>¿Cuántos días por semana puedes entrenar?</QLabel>

@@ -106,6 +106,24 @@ function WorkoutFlow({context={mode:'athlete'},date,resume,onExit}){
   const hasLoggedSets = session.some(m=>m.exercises.some(e=>e.series.some(x=>x.done)));
   const [confirmExit,setConfirmExit]=useStateE(false);
   const [verVideo,setVerVideo]=useStateE(null);
+  /* Unidad de peso. Solo afecta a lo que se ve y a los botones: por dentro
+     y en el backend todo sigue en kg, asi que el historial y las graficas no
+     cambian de significado al cambiar de unidad. */
+  const [unidad,setUnidad]=useStateE(()=>{
+    try{ return localStorage.getItem('gb_unidad')==='lb'?'lb':'kg'; }catch{ return 'kg'; }
+  });
+  const cambiarUnidad=()=>setUnidad(u=>{
+    const n=u==='kg'?'lb':'kg';
+    try{ localStorage.setItem('gb_unidad',n); }catch{}
+    return n;
+  });
+  const LB=2.20462;
+  const aVista = kg => unidad==='lb' ? Math.round(kg*LB*2)/2 : kg;
+  /* Al subir/bajar se salta 2,5 kg o 5 lb, que son los discos reales de cada
+     sistema. El kg guardado se redondea para no acumular decimales. */
+  const paso = signo => kg => unidad==='lb'
+    ? Math.max(0, Math.round((kg + signo*5/LB)*100)/100)
+    : Math.max(0, kg + signo*2.5);
   const tryExit = () => hasLoggedSets ? setConfirmExit(true) : onExit();
 
   const finishExercise=()=>{
@@ -248,17 +266,32 @@ function WorkoutFlow({context={mode:'athlete'},date,resume,onExit}){
           <button onClick={()=>setEi(Math.min(muscle.exercises.length-1,ei+1))} disabled={ei===muscle.exercises.length-1} style={{background:'none',border:'none',cursor:'pointer',padding:0,outline:'none',display:'flex',transform:'rotate(180deg)',opacity:ei===muscle.exercises.length-1?0.25:1}}><Icon name="back" size={22} color={TEXT2}/></button>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'24px 42px 1fr 1fr 28px',gap:6,alignItems:'center',padding:'0 4px 10px'}}>
-          {['SET','ANT.','KG','REPS',''].map((h,i)=><span key={i} style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em',textAlign:i>1?'center':'left'}}>{h}</span>)}
+        <div style={{display:'grid',gridTemplateColumns:'22px 40px 1fr 1fr 38px',gap:6,alignItems:'center',padding:'0 4px 10px'}}>
+          <span style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em'}}>SET</span>
+          <span style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em'}}>ANT.</span>
+          {/* La cabecera de la columna es el interruptor de unidad */}
+          <button onClick={cambiarUnidad} style={{background:'transparent',border:`1px solid ${BDEF}`,borderRadius:5,padding:'2px 0',cursor:'pointer',outline:'none',fontFamily:MONO,fontSize:9,color:TEXT2,letterSpacing:'0.1em'}}>
+            {unidad.toUpperCase()} ⇄
+          </button>
+          <span style={{fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.1em',textAlign:'center'}}>REPS</span>
+          <span></span>
         </div>
         {exercise.series.map((r,j)=>(
           <div key={j} style={{background:r.done?'rgba(159,216,154,0.05)':CARD,border:`1px solid ${r.done?'rgba(159,216,154,0.22)':BORDER}`,borderRadius:8,padding:'10px',marginBottom:8}}>
-            <div style={{display:'grid',gridTemplateColumns:'24px 42px 1fr 1fr 28px',gap:6,alignItems:'center'}}>
+            <div style={{display:'grid',gridTemplateColumns:'22px 40px 1fr 1fr 38px',gap:6,alignItems:'center'}}>
               <span style={{fontFamily:MONO,fontSize:13,color:TEXT2,textAlign:'center'}}>{j+1}</span>
-              <span style={{fontFamily:MONO,fontSize:10,color:TEXT3}}>{r.kg}×{r.reps}</span>
-              <Stepper value={r.kg} unit="kg" onDec={()=>updSeries(ss=>ss.map((x,k)=>k===j?{...x,kg:Math.max(0,x.kg-2.5)}:x))} onInc={()=>updSeries(ss=>ss.map((x,k)=>k===j?{...x,kg:x.kg+2.5}:x))}/>
+              <span style={{fontFamily:MONO,fontSize:10,color:TEXT3}}>{aVista(r.kg)}×{r.reps}</span>
+              <Stepper value={aVista(r.kg)} unit={unidad} onDec={()=>updSeries(ss=>ss.map((x,k)=>k===j?{...x,kg:paso(-1)(x.kg)}:x))} onInc={()=>updSeries(ss=>ss.map((x,k)=>k===j?{...x,kg:paso(1)(x.kg)}:x))}/>
               <Stepper value={r.reps} unit="reps" onDec={()=>updSeries(ss=>ss.map((x,k)=>k===j?{...x,reps:Math.max(0,x.reps-1)}:x))} onInc={()=>updSeries(ss=>ss.map((x,k)=>k===j?{...x,reps:x.reps+1}:x))}/>
-              <button onClick={()=>updSeries(ss=>ss.map((x,k)=>k===j?{...x,done:!x.done}:x))} style={{width:28,height:28,borderRadius:'50%',border:`1.5px solid ${r.done?SAGE:BDEF}`,background:r.done?'rgba(159,216,154,0.14)':'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',outline:'none',padding:0}}>{r.done&&<Icon name="check" size={14} color={SAGE} sw={2.4}/>}</button>
+              {/* Marcar la serie es la accion principal de esta pantalla y
+                  antes era un circulo fino que se perdia. Ahora al marcar se
+                  rellena en solido, y sin marcar hay una marca tenue que
+                  invita a pulsarla. */}
+              <button onClick={()=>updSeries(ss=>ss.map((x,k)=>k===j?{...x,done:!x.done}:x))}
+                aria-label={r.done?'Serie hecha':'Marcar serie'}
+                style={{width:36,height:36,borderRadius:'50%',border:`2px solid ${r.done?SAGE:BSTRONG}`,background:r.done?SAGE:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',outline:'none',padding:0,boxShadow:r.done?`0 0 12px rgba(159,216,154,0.5)`:'none',transition:'all 160ms ease',flexShrink:0}}>
+                <Icon name="check" size={19} color={r.done?BG:TEXT3} sw={r.done?3:2}/>
+              </button>
             </div>
             <div style={{display:'flex',gap:8,marginTop:9,paddingTop:9,borderTop:`1px solid ${BORDER}`,alignItems:'center'}}>
               <button onClick={()=>updSeries(ss=>ss.length>1?ss.filter((_,k)=>k!==j):ss)} style={{flex:1,height:30,borderRadius:8,background:'transparent',border:`1px solid ${BDEF}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,outline:'none',fontFamily:UI,fontSize:11,color:TEXT2}}><Icon name="minus" size={12} color={TEXT2} sw={2}/>Quitar</button>

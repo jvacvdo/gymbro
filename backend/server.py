@@ -1141,7 +1141,19 @@ def _pedir_a_gemini(prompt: str):
     return texto, "ok"
 
 
-def _contexto(user: dict, resumen: dict) -> str:
+async def _catalogo_texto() -> str:
+    """Ejercicios disponibles, agrupados por musculo.
+
+    Sin esto el modelo recomienda ejercicios que no existen en la app y el
+    usuario no puede registrarlos.
+    """
+    por_musculo = {}
+    async for e in db.exercises.find({}, {"name": 1, "muscle": 1}).sort("order", 1):
+        por_musculo.setdefault(e["muscle"], []).append(e["name"])
+    return "\n".join(f"- {m}: {', '.join(v)}" for m, v in por_musculo.items())
+
+
+def _contexto(user: dict, resumen: dict, catalogo: str = "") -> str:
     lineas = [
         f"Objetivo: {user.get('goal') or 'sin especificar'}",
         f"Experiencia: {user.get('experience') or 'sin especificar'}",
@@ -1157,6 +1169,11 @@ def _contexto(user: dict, resumen: dict) -> str:
             )
     if resumen["warnings"]:
         lineas.append("Avisos: " + " ".join(resumen["warnings"]))
+    if catalogo:
+        lineas.append(
+            "\nEjercicios disponibles en la app (recomienda SOLO de esta lista):\n"
+            + catalogo
+        )
     return "\n".join(lineas)
 
 
@@ -1224,10 +1241,13 @@ async def coach_ask(body: CoachAsk, user: dict = Depends(get_current_user)):
         "directo y breve (máximo 5 frases). Nada de vocativos tipo "
         "'campeón' ni exclamaciones. Responde a la pregunta usando "
         "solo los datos reales que te doy.\n"
-        "Reglas: no inventes cifras. Si no tienes el dato, dilo. No des "
+        "Puedes recomendar ejercicios, pero SOLO de la lista que te doy, "
+        "y di a qué músculo pertenece cada uno.\n"
+        "Reglas: no inventes cifras ni ejercicios fuera de la lista. Si no "
+        "tienes el dato, dilo. No des "
         "consejo médico ni de nutrición: para eso remite a un profesional. "
         "No uses emojis.\n\n"
-        + _contexto(user, resumen)
+        + _contexto(user, resumen, await _catalogo_texto())
         + f"\n\nPregunta: {pregunta}"
     )
     texto, motivo = await asyncio.to_thread(_pedir_a_gemini, prompt)

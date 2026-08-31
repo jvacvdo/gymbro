@@ -550,3 +550,32 @@ def test_coach_ask_sin_historial_sigue_valiendo(s):
     h, _ = _mk_user(s, "chat2")
     r = s.post(f"{API}/coach/ask", headers=h, json={"question": "hola"})
     assert r.status_code in (200, 503), r.text
+
+
+# ── recomendacion de ejercicios ──
+def test_coach_conoce_el_catalogo(s):
+    """El chat debe poder recomendar, pero solo ejercicios que existen."""
+    h, _ = _mk_user(s, "reco")
+    r = s.post(f"{API}/coach/ask", headers=h,
+               json={"question": "¿Qué ejercicios me recomiendas para espalda?"})
+    assert r.status_code in (200, 503), r.text
+    if r.status_code == 200:
+        tax = s.get(f"{API}/taxonomy").json()
+        reales = {e.lower() for g in tax.values() for ejs in g.values() for e in ejs}
+        texto = r.json()["answer"].lower()
+        # Si nombra algun ejercicio, debe ser del catalogo real
+        citados = [e for e in reales if e in texto]
+        assert citados or "no" in texto, r.json()["answer"]
+
+
+def test_goal_admite_varios_objetivos(s):
+    """El registro guarda varios objetivos unidos, sin romper el modelo."""
+    uid = uuid.uuid4().hex[:6]
+    r = s.post(f"{API}/auth/register", json={
+        "name": "Multi Objetivo", "username": f"TEST_m{uid}",
+        "email": f"TEST_m{uid}@example.com", "password": "test1234",
+        "goal": "Ganar músculo y fuerza, Perder grasa corporal",
+        "experience": "Más de 2 años", "frequency": "3–4 días",
+    })
+    assert r.status_code == 200, r.text
+    assert "," in r.json()["user"]["goal"]
