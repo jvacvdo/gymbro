@@ -159,43 +159,76 @@ function ProgressRing({size=120,progress=0.7,value,label,sub,color='sage',sw=5})
   );
 }
 
-/* ── Calendar (month grid) ───────────────────────────── */
-function Calendar({trained=[],planned=[],selected=null,onDay,year,month}){
-  /* El mes que se pinta. Sin props, el mes en curso del dispositivo. */
-  const now=new Date();
-  const y = year==null?now.getFullYear():year;
-  const m = month==null?now.getMonth()+1:month;   // 1-12
+/* ── Calendario ──────────────────────────────────────────
+   Tres vistas: mes, semana y dia. `trained` y `planned` llegan como fechas
+   ISO completas, no como numeros de dia: una semana puede cruzar dos meses y
+   con solo el numero no se sabria a cual pertenece cada casilla. */
+function isoDe(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+/* Lunes de la semana de una fecha. getDay() empieza en domingo. */
+function lunesDe(d){
+  const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  x.setDate(x.getDate()-((x.getDay()+6)%7));
+  return x;
+}
 
-  /* Hueco inicial: la rejilla empieza en lunes, getDay() empieza en domingo. */
-  const firstDow=(new Date(y,m-1,1).getDay()+6)%7;
-  const nDays=new Date(y,m,0).getDate();          // dia 0 del mes siguiente = ultimo de este
-  const days=[]; for(let i=0;i<firstDow;i++) days.push(null);
-  for(let d=1;d<=nDays;d++) days.push(d);
-
-  /* Solo se marca "hoy" si el mes pintado es el mes actual. */
-  const today = (y===now.getFullYear()&&m===now.getMonth()+1) ? now.getDate() : null;
+function Calendar({trained=[],planned=[],selected=null,onDay,anchor,mode='mes'}){
+  const hoy=new Date();
+  const base=anchor||hoy;
+  const hoyISO=isoDe(hoy);
+  const marcadas=new Set(trained), planeadas=new Set(planned);
   const dow=['L','M','X','J','V','S','D'];
+
+  /* Celdas a pintar: null es hueco de relleno. */
+  let celdas=[];
+  if(mode==='mes'){
+    const y=base.getFullYear(), m=base.getMonth();
+    const hueco=(new Date(y,m,1).getDay()+6)%7;
+    const nDias=new Date(y,m+1,0).getDate();
+    for(let i=0;i<hueco;i++) celdas.push(null);
+    for(let d=1;d<=nDias;d++) celdas.push(new Date(y,m,d));
+  }else if(mode==='semana'){
+    const l=lunesDe(base);
+    for(let i=0;i<7;i++) celdas.push(new Date(l.getFullYear(),l.getMonth(),l.getDate()+i));
+  }else{
+    celdas=[new Date(base.getFullYear(),base.getMonth(),base.getDate())];
+  }
+
+  const Celda=({d,grande})=>{
+    if(d===null) return <div></div>;
+    const iso=isoDe(d);
+    const entrenado=marcadas.has(iso), planificado=planeadas.has(iso);
+    const esHoy=iso===hoyISO, elegido=iso===selected;
+    let border=`1px solid ${BORDER}`, bg=CARD, ring='none';
+    if(planificado) border=`1px solid ${BSTRONG}`;
+    if(entrenado) bg='var(--gb-elev)';
+    if(elegido) border=`1.5px solid var(--gb-text1)`;
+    if(esHoy&&!elegido) ring=`0 0 0 1.5px var(--gb-text1)`;
+    return(
+      <button onClick={()=>onDay&&onDay(d)}
+        style={{position:'relative',aspectRatio:grande?'auto':'1',minHeight:grande?96:undefined,borderRadius:R,background:bg,border,boxShadow:ring,cursor:'pointer',outline:'none',display:'flex',flexDirection:grande?'column':'row',alignItems:'center',justifyContent:'center',gap:grande?6:0,padding:0}}>
+        <span style={{fontFamily:grande?DSP:UI,fontWeight:grande?700:(esHoy?600:400),fontSize:grande?30:13,color:entrenado||esHoy||elegido?TEXT1:TEXT2}}>{d.getDate()}</span>
+        {grande&&(
+          <span style={{fontFamily:UI,fontSize:12.5,color:TEXT2}}>
+            {entrenado?'Entrenado':planificado?'Planificado':'Sin sesión'}
+          </span>
+        )}
+        {entrenado&&!grande&&<span style={{position:'absolute',bottom:5,left:'50%',transform:'translateX(-50%)',width:4,height:4,borderRadius:'50%',background:SAGE,boxShadow:`0 0 5px ${SAGE}`}}></span>}
+        {entrenado&&grande&&<span style={{width:6,height:6,borderRadius:'50%',background:SAGE,boxShadow:`0 0 6px ${SAGE}`}}></span>}
+      </button>
+    );
+  };
+
+  if(mode==='dia') return <div><Celda d={celdas[0]} grande/></div>;
+
   return(
     <div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6,marginBottom:8}}>
         {dow.map((d,i)=><div key={i} style={{textAlign:'center',fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.08em'}}>{d}</div>)}
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6}}>
-        {days.map((d,i)=>{
-          if(d===null) return <div key={i}></div>;
-          const isTrained=trained.includes(d), isPlanned=planned.includes(d), isToday=d===today, isSel=d===selected;
-          let border=`1px solid ${BORDER}`, bg=CARD, ring='none';
-          if(isPlanned) border=`1px solid ${BSTRONG}`;
-          if(isTrained){bg='var(--gb-elev)';}
-          if(isSel) border=`1.5px solid var(--gb-text1)`;
-          if(isToday&&!isSel) ring=`0 0 0 1.5px var(--gb-text1)`;
-          return(
-            <button key={i} onClick={()=>onDay&&onDay(d)} style={{position:'relative',aspectRatio:'1',borderRadius:R,background:bg,border,boxShadow:ring,cursor:'pointer',outline:'none',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
-              <span style={{fontFamily:UI,fontSize:13,color:isTrained||isToday||isSel?TEXT1:TEXT2,fontWeight:isToday?600:400}}>{d}</span>
-              {isTrained&&<span style={{position:'absolute',bottom:5,left:'50%',transform:'translateX(-50%)',width:4,height:4,borderRadius:'50%',background:SAGE,boxShadow:`0 0 5px ${SAGE}`}}></span>}
-            </button>
-          );
-        })}
+        {celdas.map((d,i)=><Celda key={i} d={d}/>)}
       </div>
     </div>
   );
@@ -391,6 +424,7 @@ function lastMonthsShort(n=4){ const d=new Date(), out=[];
 window.GB = {
   BG,CARD,ELEV,INPUT,OW,SAGE,STEEL,AMBER,NEUTRAL,BORDER,BDEF,BSTRONG,TEXT1,TEXT2,TEXT3,UI,DSP,MONO,R,
   MONTHS, monthLabel, monthKey, todayISO, dayLabel, lastMonthsShort,
+  isoDe, lunesDe,
   TAXONOMY, Icon, Isotype, Logo, ThemeToggle, StatusBar, TabBar, ProgressRing, Calendar, PeriodToggle,
   Pill, PillRow, Field, PrimaryBtn, OutlineBtn, GhostLink, BottomSheet, LineChart, StatusDot, Stepper, QRPlaceholder, DaySelector,
 };

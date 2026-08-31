@@ -17,6 +17,9 @@ function HomeScreen({onEntrena,light,onToggle}){
   const { BG,CARD,ELEV,OW,SAGE,STEEL,BORDER,BDEF,TEXT1,TEXT2,TEXT3,UI,DSP,MONO,
           Icon,Logo,ThemeToggle,StatusBar,Calendar,PeriodToggle,Pill,PillRow,BottomSheet,LineChart,PrimaryBtn } = H;
   const [period,setPeriod]=useStateH('Mes');
+  /* Fecha de referencia de la vista. Las flechas la mueven un dia, una
+     semana o un mes segun lo que este seleccionado. */
+  const [ancla,setAncla]=useStateH(()=>new Date());
   const [selDay,setSelDay]=useStateH(null);
   const [group,setGroup]=useStateH('Tren Superior');
   const [muscle,setMuscle]=useStateH('Pecho');
@@ -26,22 +29,53 @@ function HomeScreen({onEntrena,light,onToggle}){
   const [next,setNext]=useStateH(null);
   const [chart,setChart]=useStateH([]);
 
-  /* Mes que se muestra. Se recalcula en cada render, asi que si la app
-     queda abierta y cambia el dia, el calendario sigue al reloj. */
-  const MES=H.monthKey();
+  const modo = period==='Mes'?'mes':period==='Semana'?'semana':'dia';
 
-  /* Calendario del mes + proxima sesion */
+  /* Meses que hay que pedir. Una semana puede cruzar dos meses, y entonces
+     con uno solo faltarian marcas en la mitad de las casillas. */
+  const mesesVisibles=(()=>{
+    const claves=new Set([H.monthKey(ancla.getFullYear(),ancla.getMonth()+1)]);
+    if(modo==='semana'){
+      const l=H.lunesDe(ancla);
+      const d=new Date(l.getFullYear(),l.getMonth(),l.getDate()+6);
+      claves.add(H.monthKey(d.getFullYear(),d.getMonth()+1));
+    }
+    return [...claves];
+  })();
+  const clave=mesesVisibles.join(',');
+
+  /* Calendario + proxima sesion */
   useEffectH(()=>{
     let alive=true;
-    H.api.getSessions(MES).then(rows=>{
-      if(!alive) return;
-      const day=d=>parseInt(String(d).slice(8,10),10);
-      setTrained(rows.filter(r=>r.status==='entrenado').map(r=>day(r.date)));
-      setPlanned(rows.filter(r=>r.status==='planificado').map(r=>day(r.date)));
-    }).catch(()=>{});
+    Promise.all(mesesVisibles.map(m=>H.api.getSessions(m).catch(()=>[])))
+      .then(listas=>{
+        if(!alive) return;
+        const filas=listas.flat();
+        setTrained(filas.filter(r=>r.status==='entrenado').map(r=>r.date));
+        setPlanned(filas.filter(r=>r.status==='planificado').map(r=>r.date));
+      });
     H.api.getNextSession().then(n=>{ if(alive) setNext(n); }).catch(()=>{});
     return ()=>{alive=false;};
-  },[MES]);
+  },[clave]);
+
+  /* Mover la vista. El salto depende de lo que se este mirando. */
+  const mover=(signo)=>setAncla(a=>{
+    const d=new Date(a.getFullYear(),a.getMonth(),a.getDate());
+    if(modo==='mes') d.setMonth(d.getMonth()+signo);
+    else if(modo==='semana') d.setDate(d.getDate()+7*signo);
+    else d.setDate(d.getDate()+signo);
+    return d;
+  });
+
+  /* Titulo segun la vista */
+  const titulo=(()=>{
+    if(modo==='mes') return H.monthLabel(ancla.getFullYear(),ancla.getMonth()+1);
+    if(modo==='dia') return `${ancla.getDate()} de ${H.MONTHS[ancla.getMonth()]}`;
+    const l=H.lunesDe(ancla), f=new Date(l.getFullYear(),l.getMonth(),l.getDate()+6);
+    return l.getMonth()===f.getMonth()
+      ? `${l.getDate()}–${f.getDate()} de ${H.MONTHS[l.getMonth()]}`
+      : `${l.getDate()} ${H.MONTHS[l.getMonth()].slice(0,3)} – ${f.getDate()} ${H.MONTHS[f.getMonth()].slice(0,3)}`;
+  })();
 
   /* Historial muscular: serie de carga maxima del musculo activo */
   useEffectH(()=>{
@@ -55,7 +89,9 @@ function HomeScreen({onEntrena,light,onToggle}){
   /* La lista del mes solo trae fecha y estado. El detalle por dia solo lo
      conocemos de la proxima sesion; el resto de dias abren en estado vacio. */
   const nextDay = next ? parseInt(String(next.date).slice(8,10),10) : null;
-  const plan = (selDay && selDay===nextDay) ? {groups:toGroups(next.muscles)} : null;
+  /* selDay es una fecha ISO completa desde que el calendario navega entre
+     meses: comparar solo el numero de dia mezclaria dias de meses distintos. */
+  const plan = (selDay && next && selDay===next.date) ? {groups:toGroups(next.muscles)} : null;
 
   const groups=Object.keys(H.TAXONOMY);
   const muscles=Object.keys(H.TAXONOMY[group]);
@@ -71,12 +107,18 @@ function HomeScreen({onEntrena,light,onToggle}){
         </div>
 
         {/* Calendar module */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-          <span style={{fontFamily:DSP,fontWeight:400,fontSize:22,color:TEXT1,letterSpacing:'-0.01em'}}>{H.monthLabel()}</span>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,gap:10}}>
+          <button onClick={()=>mover(-1)} aria-label="Anterior" style={{background:'transparent',border:`1px solid ${H.BDEF}`,borderRadius:R8(),width:32,height:32,cursor:'pointer',outline:'none',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            <Icon name="back" size={16} color={TEXT2}/>
+          </button>
+          <span style={{fontFamily:DSP,fontWeight:400,fontSize:20,color:TEXT1,letterSpacing:'-0.01em',textAlign:'center',flex:1}}>{titulo}</span>
+          <button onClick={()=>mover(1)} aria-label="Siguiente" style={{background:'transparent',border:`1px solid ${H.BDEF}`,borderRadius:R8(),width:32,height:32,cursor:'pointer',outline:'none',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transform:'rotate(180deg)'}}>
+            <Icon name="back" size={16} color={TEXT2}/>
+          </button>
         </div>
         <div style={{marginBottom:14}}><PeriodToggle value={period} onChange={setPeriod}/></div>
         <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:R8(),padding:16,marginBottom:22}}>
-          <Calendar trained={trained} planned={planned} selected={selDay} onDay={setSelDay}/>
+          <Calendar trained={trained} planned={planned} selected={selDay} onDay={d=>setSelDay(H.isoDe(d))} anchor={ancla} mode={modo}/>
           <div style={{display:'flex',gap:16,marginTop:14,paddingTop:12,borderTop:`1px solid ${BORDER}`}}>
             <span style={{display:'flex',alignItems:'center',gap:6,fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.08em',textTransform:'uppercase'}}><span style={{width:5,height:5,borderRadius:'50%',background:SAGE,boxShadow:`0 0 5px ${SAGE}`}}></span>Entrenado</span>
             <span style={{display:'flex',alignItems:'center',gap:6,fontFamily:MONO,fontSize:9,color:TEXT3,letterSpacing:'0.08em',textTransform:'uppercase'}}><span style={{width:9,height:9,borderRadius:3,border:`1px solid ${H.BSTRONG}`}}></span>Planificado</span>
@@ -131,7 +173,7 @@ function HomeScreen({onEntrena,light,onToggle}){
       </div>
 
       {/* Day sheet */}
-      <BottomSheet open={!!selDay} onClose={()=>setSelDay(null)} title={selDay?H.dayLabel(selDay):''}>
+      <BottomSheet open={!!selDay} onClose={()=>setSelDay(null)} title={selDay?`${parseInt(selDay.slice(8,10),10)} de ${H.MONTHS[parseInt(selDay.slice(5,7),10)-1]}`:''}>
         {plan? (
           <>
             {plan.groups.map((g,i)=>(

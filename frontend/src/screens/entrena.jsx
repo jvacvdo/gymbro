@@ -375,11 +375,14 @@ function EntrenaScreen({onFinish}){
   const { BG,CARD,OW,SAGE,BORDER,BDEF,TEXT1,TEXT2,UI,DSP,MONO,R,
           Icon,StatusBar,Calendar } = E;
   const [flow,setFlow]=useStateE(false);
-  const [selDay,setSelDay]=useStateE(new Date().getDate());
+  const [ancla,setAncla]=useStateE(()=>new Date());
+  const [selDay,setSelDay]=useStateE(()=>E.todayISO());
   const [cal,setCal]=useStateE({trained:[],planned:[]});
   const [pendiente,setPendiente]=useStateE(null);   // sesion a medias del backend
   const [reanudar,setReanudar]=useStateE(null);     // la que se esta reanudando
-  const MES=E.monthKey();
+  const MES=E.monthKey(ancla.getFullYear(),ancla.getMonth()+1);
+  /* Se puede planificar en meses futuros, no solo en el actual. */
+  const moverMes=signo=>setAncla(a=>new Date(a.getFullYear(),a.getMonth()+signo,1));
 
   /* Busca una sesion sin cerrar de hoy. El autoguardado la deja como
      "planificado", asi que al volver se puede retomar donde se dejo en vez
@@ -400,17 +403,16 @@ function EntrenaScreen({onFinish}){
     let alive=true;
     E.api.getSessions(MES).then(rows=>{
       if(!alive) return;
-      const day=d=>parseInt(String(d).slice(8,10),10);
       setCal({
-        trained:rows.filter(r=>r.status==='entrenado').map(r=>day(r.date)),
-        planned:rows.filter(r=>r.status==='planificado').map(r=>day(r.date)),
+        trained:rows.filter(r=>r.status==='entrenado').map(r=>r.date),
+        planned:rows.filter(r=>r.status==='planificado').map(r=>r.date),
       });
     }).catch(()=>{});
     return ()=>{alive=false;};
   },[flow,MES]);
   /* El dia elegido en el calendario es el dia con el que se guarda la sesion.
      Antes se seleccionaba un dia y la sesion caia siempre en hoy. */
-  const fecha=`${MES}-${String(selDay).padStart(2,'0')}`;
+  const fecha=selDay;
   if(flow) return <WorkoutFlow context={{mode:'athlete'}} date={fecha} resume={reanudar}
     onExit={()=>{setFlow(false);setReanudar(null);onFinish&&onFinish();}}/>;
   return(
@@ -420,8 +422,16 @@ function EntrenaScreen({onFinish}){
         <div style={{fontFamily:DSP,fontWeight:400,fontSize:28,color:TEXT1,letterSpacing:'-0.01em',marginBottom:6}}>Entrena</div>
         <div style={{fontFamily:UI,fontSize:14,color:TEXT2,marginBottom:22}}>Elige un día para planificar tu sesión.</div>
         <div style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:R,padding:16,marginBottom:16}}>
-          <div style={{fontFamily:DSP,fontWeight:400,fontSize:18,color:TEXT1,marginBottom:14}}>{E.monthLabel()}</div>
-          <Calendar trained={cal.trained} planned={cal.planned} selected={selDay} onDay={setSelDay}/>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,gap:10}}>
+            <button onClick={()=>moverMes(-1)} aria-label="Mes anterior" style={{background:'transparent',border:`1px solid ${BDEF}`,borderRadius:R,width:30,height:30,cursor:'pointer',outline:'none',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <Icon name="back" size={15} color={TEXT2}/>
+            </button>
+            <div style={{fontFamily:DSP,fontWeight:400,fontSize:18,color:TEXT1,flex:1,textAlign:'center'}}>{E.monthLabel(ancla.getFullYear(),ancla.getMonth()+1)}</div>
+            <button onClick={()=>moverMes(1)} aria-label="Mes siguiente" style={{background:'transparent',border:`1px solid ${BDEF}`,borderRadius:R,width:30,height:30,cursor:'pointer',outline:'none',display:'flex',alignItems:'center',justifyContent:'center',transform:'rotate(180deg)'}}>
+              <Icon name="back" size={15} color={TEXT2}/>
+            </button>
+          </div>
+          <Calendar trained={cal.trained} planned={cal.planned} selected={selDay} onDay={d=>setSelDay(E.isoDe(d))} anchor={ancla}/>
         </div>
         {pendiente&&(
           <div style={{background:'rgba(159,216,154,0.08)',border:`1px solid rgba(159,216,154,0.28)`,borderRadius:R,padding:'15px 16px',marginBottom:14}}>
