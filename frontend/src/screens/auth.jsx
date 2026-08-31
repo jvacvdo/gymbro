@@ -4,7 +4,8 @@ const { BG,CARD,ELEV,INPUT,OW,SAGE,STEEL,BORDER,BDEF,BSTRONG,TEXT1,TEXT2,TEXT3,U
 const { useState:useStateA } = React;
 
 /* ── Welcome ─────────────────────────────────────────── */
-function WelcomeScreen({onStart,onLogin}){
+function WelcomeScreen({onStart,onLogin,onDone}){
+  const [errW,setErrW]=useStateA('');
   return(
     <div style={{position:'absolute',inset:0,background:BG,display:'flex',flexDirection:'column'}}>
       <StatusBar/>
@@ -17,7 +18,11 @@ function WelcomeScreen({onStart,onLogin}){
           <div style={{fontFamily:UI,fontSize:16,lineHeight:1.5,color:TEXT2,maxWidth:290}}>Tus datos, traducidos al instante. Sabe si tu esfuerzo rinde y qué mover para seguir subiendo.</div>
         </div>
         <div style={{paddingBottom:34,display:'flex',flexDirection:'column',gap:12}}>
+          {errW&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',textAlign:'center'}}>{errW}</div>}
           <PrimaryBtn onClick={onStart} icon="chevron-right">Empezar</PrimaryBtn>
+          {/* Registrarse con Google desde aqui: antes habia que pasar por dos
+              pantallas de preguntas para llegar al boton. */}
+          <GoogleButton label="Continuar con Google" onDone={r=>onDone&&onDone(r)} onError={setErrW}/>
           <button onClick={onLogin} style={{width:'100%',height:52,background:'transparent',border:`1px solid ${BDEF}`,borderRadius:R,fontFamily:UI,fontWeight:500,fontSize:15,color:TEXT1,cursor:'pointer',outline:'none'}}>Ya tengo cuenta</button>
         </div>
       </div>

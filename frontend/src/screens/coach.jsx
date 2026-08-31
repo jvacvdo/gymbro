@@ -11,7 +11,6 @@ function CoachCard({onEntrena}){
           Icon,BottomSheet,PrimaryBtn,OutlineBtn,Field } = CO;
   const [data,setData]=useStateCO(null);
   const [cargando,setCargando]=useStateCO(true);
-  const [abierto,setAbierto]=useStateCO(false);
 
   useEffectCO(()=>{
     let vivo=true;
@@ -73,7 +72,7 @@ function CoachCard({onEntrena}){
 
         {data.has_data
           ? <div style={{display:'flex',gap:9}}>
-              <div style={{flex:1}}><OutlineBtn onClick={()=>setAbierto(true)} icon="message">Preguntar</OutlineBtn></div>
+              <div style={{flex:1}}><OutlineBtn onClick={()=>window.dispatchEvent(new CustomEvent('gb:abrir-chat'))} icon="message">Preguntar</OutlineBtn></div>
               <div style={{flex:1}}><PrimaryBtn onClick={onEntrena} color={SAGE} icon="chevron-right">Entrenar</PrimaryBtn></div>
             </div>
           : <PrimaryBtn onClick={onEntrena} color={SAGE} icon="chevron-right">Registrar sesión</PrimaryBtn>}
@@ -83,61 +82,7 @@ function CoachCard({onEntrena}){
         </div>
       </div>
 
-      <AskSheet open={abierto} onClose={()=>setAbierto(false)}/>
     </>
-  );
-}
-
-/* ── Preguntas libres ────────────────────────────────── */
-function AskSheet({open,onClose}){
-  const { TEXT1,TEXT2,TEXT3,UI,MONO,BORDER,BottomSheet,Field,PrimaryBtn,OutlineBtn } = CO;
-  const [q,setQ]=useStateCO('');
-  const [resp,setResp]=useStateCO('');
-  const [busy,setBusy]=useStateCO(false);
-  const [err,setErr]=useStateCO('');
-
-  const SUGERIDAS=[
-    '¿Por qué no progreso?',
-    '¿Cuántas series debería hacer?',
-    '¿Qué entreno mañana?',
-  ];
-
-  const preguntar=async(texto)=>{
-    const t=(texto!==undefined?texto:q).trim();
-    if(!t||busy) return;
-    setBusy(true); setErr(''); setResp('');
-    if(texto!==undefined) setQ(texto);
-    try{
-      const r=await CO.api.askCoach(t);
-      setResp(r.answer);
-    }catch(e){ setErr(e.message||'No se pudo responder'); }
-    finally{ setBusy(false); }
-  };
-  const cerrar=()=>{ setQ(''); setResp(''); setErr(''); onClose(); };
-
-  return(
-    <BottomSheet open={open} onClose={cerrar} title="Pregunta a tu entrenador">
-      <div style={{display:'flex',flexWrap:'wrap',gap:7,marginBottom:14}}>
-        {SUGERIDAS.map(s=>(
-          <button key={s} onClick={()=>preguntar(s)} disabled={busy}
-            style={{fontFamily:UI,fontSize:12,color:TEXT2,background:'transparent',border:`1px solid ${BORDER}`,borderRadius:999,padding:'6px 12px',cursor:busy?'default':'pointer',outline:'none'}}>{s}</button>
-        ))}
-      </div>
-
-      <Field label="Tu pregunta" placeholder="¿Qué quieres saber?" value={q} onChange={e=>setQ(e.target.value)}/>
-
-      {resp&&(
-        <div style={{background:'var(--gb-elev)',border:`1px solid ${BORDER}`,borderRadius:8,padding:'14px 15px',marginBottom:14}}>
-          <div style={{fontFamily:UI,fontSize:13.5,color:TEXT1,lineHeight:1.6,whiteSpace:'pre-wrap'}}>{resp}</div>
-        </div>
-      )}
-      {err&&<div style={{fontFamily:UI,fontSize:12.5,color:'#E0A0A0',marginBottom:12,lineHeight:1.5}}>{err}</div>}
-
-      <div style={{marginBottom:10}}>
-        <PrimaryBtn onClick={()=>preguntar()} disabled={busy||!q.trim()} icon="chevron-right">{busy?'Pensando…':'Preguntar'}</PrimaryBtn>
-      </div>
-      <OutlineBtn onClick={cerrar}>Cerrar</OutlineBtn>
-    </BottomSheet>
   );
 }
 

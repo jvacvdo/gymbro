@@ -24,6 +24,7 @@ export default function App() {
   const [route, setRoute] = useState(() =>
     RESET_TOKEN ? 'reset' : (G && G.api && G.api.getToken() ? 'app' : 'welcome'));
   const [tab, setTab] = useState('inicio');
+  const [chat, setChat] = useState(false);
   const [light, setLight] = useState(false);
   const toggle = () => setLight(v => !v);
 
@@ -32,8 +33,13 @@ export default function App() {
   // le hacia perder el entrenamiento entero al intentar guardarlo.
   useEffect(() => {
     const salir = () => { setTab('inicio'); setRoute('login'); };
+    const abrirChat = () => setChat(true);
     window.addEventListener('gb:sesion-caducada', salir);
-    return () => window.removeEventListener('gb:sesion-caducada', salir);
+    window.addEventListener('gb:abrir-chat', abrirChat);
+    return () => {
+      window.removeEventListener('gb:sesion-caducada', salir);
+      window.removeEventListener('gb:abrir-chat', abrirChat);
+    };
   }, []);
 
   const frame = {
@@ -55,7 +61,7 @@ export default function App() {
   if (route === 'reset')
     return wrap(<G.ResetPasswordScreen token={RESET_TOKEN} onDone={() => entrar()} onCancel={() => setRoute('welcome')} />);
   if (route === 'welcome')
-    return wrap(<G.WelcomeScreen onStart={() => setRoute('register')} onLogin={() => setRoute('login')} />);
+    return wrap(<G.WelcomeScreen onStart={() => setRoute('register')} onLogin={() => setRoute('login')} onDone={entrar} />);
   if (route === 'register')
     return wrap(<G.RegisterScreen onBack={() => setRoute('welcome')} onDone={entrar} onToLogin={() => setRoute('login')} />);
   if (route === 'onboarding')
@@ -75,7 +81,11 @@ export default function App() {
       {tab === 'gymbro'   && <G.GymBroScreen />}
       {tab === 'progreso' && <G.ProgresoScreen />}
       {tab === 'perfil'   && <G.PerfilScreen light={light} onToggle={toggle} onLogout={() => { setTab('inicio'); setRoute('welcome'); }} />}
+      {/* El chat del entrenador se abre desde cualquier pestana, salvo
+          GymBro, que ya tiene su propio boton flotante. */}
+      {tab !== 'gymbro' && <G.CoachFab onClick={() => setChat(true)} />}
       <G.TabBar active={tab} onTab={setTab} />
+      <G.CoachChat open={chat} onClose={() => setChat(false)} />
     </React.Fragment>
   );
 }

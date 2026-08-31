@@ -1160,8 +1160,16 @@ def _contexto(user: dict, resumen: dict) -> str:
     return "\n".join(lineas)
 
 
+class CoachTurn(BaseModel):
+    role: str      # 'tu' | 'coach'
+    text: str
+
+
 class CoachAsk(BaseModel):
     question: str
+    # Turnos previos. Sin esto cada pregunta llegaba suelta y el entrenador
+    # no podia entender un "y entonces?".
+    history: List[CoachTurn] = []
 
 
 @api.get("/coach")
@@ -1200,6 +1208,17 @@ async def coach_ask(body: CoachAsk, user: dict = Depends(get_current_user)):
         )
 
     resumen = await _resumen_entrenador(user)
+
+    # Solo los ultimos turnos: mandar el hilo entero encarece cada llamada y
+    # agota antes la cuota gratuita.
+    hilo = ""
+    if body.history:
+        lineas = [
+            ("Usuario: " if t.role == "tu" else "Tú: ") + t.text[:400]
+            for t in body.history[-6:]
+        ]
+        hilo = "\n\nConversación hasta ahora:\n" + "\n".join(lineas)
+
     prompt = (
         "Eres un entrenador de gimnasio hablando en español de España, "
         "directo y breve (máximo 5 frases). Nada de vocativos tipo "

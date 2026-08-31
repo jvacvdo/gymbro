@@ -18,6 +18,7 @@ import './screens/gymbro.jsx';
 import './screens/legal.jsx';
 import './screens/coach.jsx';
 import './screens/video.jsx';
+import './screens/chat.jsx';
 
 import App from './App.jsx';
 

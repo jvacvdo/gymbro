@@ -528,3 +528,25 @@ def test_retomar_actualiza_y_no_duplica(s):
     sesiones = s.get(f"{API}/sessions", headers=h, params={"month": mes}).json()
     assert len(sesiones) == 1, sesiones          # una sola, no dos
     assert sesiones[0]["status"] == "entrenado"
+
+
+# ── chat con historial ──
+def test_coach_ask_acepta_historial(s):
+    h, _ = _mk_user(s, "chat")
+    r = s.post(f"{API}/coach/ask", headers=h, json={
+        "question": "¿y entonces?",
+        "history": [
+            {"role": "tu", "text": "¿qué entreno hoy?"},
+            {"role": "coach", "text": "Hoy toca pecho."},
+        ],
+    })
+    # 200 con clave, 503 sin ella. Nunca un 422 por la forma del historial.
+    assert r.status_code in (200, 503), r.text
+    if r.status_code == 200:
+        assert r.json()["answer"]
+
+
+def test_coach_ask_sin_historial_sigue_valiendo(s):
+    h, _ = _mk_user(s, "chat2")
+    r = s.post(f"{API}/coach/ask", headers=h, json={"question": "hola"})
+    assert r.status_code in (200, 503), r.text

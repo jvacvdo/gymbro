@@ -133,8 +133,8 @@ export function getVideos() {
 export function getCoach() {
   return request('/coach');
 }
-export function askCoach(question) {
-  return request('/coach/ask', { method: 'POST', body: { question } });
+export function askCoach(question, history = []) {
+  return request('/coach/ask', { method: 'POST', body: { question, history } });
 }
 
 // ── Conexiones ────────────────────────────────────────
