@@ -395,7 +395,8 @@ function RegisterScreen({onBack,onDone,onToLogin,onboardingOnly}){
             )}
             <GoogleButton label="Continuar con Google" onDone={r=>onDone(r)} onError={setErr}/>
             <div style={{fontFamily:UI,fontSize:11.5,color:TEXT3,textAlign:'center',lineHeight:1.5,marginTop:16}}>
-              Al crear tu cuenta aceptas nuestra{' '}
+              Al crear tu cuenta aceptas las{' '}
+              <a href="/terminos.html" target="_blank" rel="noopener noreferrer" style={{color:TEXT2,textDecoration:'underline'}}>condiciones del servicio</a>{' '}y la{' '}
               <button onClick={()=>setPriv(true)} style={{background:'none',border:'none',padding:0,cursor:'pointer',fontFamily:UI,fontSize:11.5,color:TEXT2,textDecoration:'underline',outline:'none'}}>política de privacidad</button>.
             </div>
             <div style={{textAlign:'center',marginTop:10}}>
